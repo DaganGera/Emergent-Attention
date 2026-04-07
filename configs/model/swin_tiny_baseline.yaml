@@ -1,0 +1,4 @@
+# Swin-Tiny baseline (from timm)
+name: swin_tiny_patch4_window7_224
+num_classes: 100
+pretrained: false

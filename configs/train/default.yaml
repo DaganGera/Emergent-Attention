@@ -1,0 +1,33 @@
+# Default training configuration
+optimizer:
+  name: adamw
+  lr: 5.0e-4
+  weight_decay: 0.05
+  betas: [0.9, 0.999]
+  eps: 1.0e-8
+
+scheduler:
+  name: cosine
+  epochs: 300
+  warmup_epochs: 10
+  min_lr: 1.0e-6
+
+training:
+  epochs: 300
+  grad_clip: 1.0
+  label_smoothing: 0.1
+  amp: true
+  ema: true
+  ema_decay: 0.9999
+  seed: 42
+  checkpoint_freq: 10  # save every N epochs
+  eval_freq: 1
+
+augmentation:
+  mixup_alpha: 0.8
+  cutmix_alpha: 1.0
+  mixup_prob: 0.5
+  cutmix_prob: 0.5
+  rand_augment_magnitude: 9
+  rand_augment_std: 0.5
+  random_erasing_prob: 0.25

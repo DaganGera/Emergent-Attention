@@ -1,0 +1,6 @@
+# Master training config — composed from sub-configs
+defaults:
+  - model: nca_vit_tiny
+  - data: cifar100
+  - training: default
+  - _self_

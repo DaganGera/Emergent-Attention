@@ -1,0 +1,4 @@
+# ViT-Tiny baseline (from timm)
+name: vit_tiny_patch16_224
+num_classes: 100
+pretrained: false

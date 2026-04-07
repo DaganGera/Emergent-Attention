@@ -1,0 +1,49 @@
+# Data and checkpoints
+data/
+checkpoints/
+*.pt
+*.pth
+
+# Experiment tracking
+wandb/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+
+# Hydra outputs
+outputs/
+multirun/
+.hydra/
+
+# Results and figures (generated, not source)
+results/*.csv
+results/*.json
+figures/*.png
+figures/*.pdf
+figures/*.gif
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

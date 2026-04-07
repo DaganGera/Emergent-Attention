@@ -1,0 +1,20 @@
+# Hybrid NCA-ViT configuration (first 6 NCA, last 6 self-attention)
+name: nca_vit_hybrid
+img_size: 224
+patch_size: 16
+in_chans: 3
+num_classes: 100
+embed_dim: 192
+depth: 12
+nca_depth: 6
+attn_depth: 6
+nca_steps: 4
+num_filters: 3
+perception_filters:
+  - sobel_x
+  - sobel_y
+  - identity
+stochastic_rate: 0.5
+update_hidden_dim: 384
+cls_strategy: exclude
+mlp_ratio: 4.0

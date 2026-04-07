@@ -1,0 +1,46 @@
+# Ablation sweep configuration
+# Launch with: python scripts/ablation_sweep.py
+
+# A1: NCA steps K
+ablation_K:
+  model.nca_steps: [1, 2, 4, 8, 16]
+
+# A2: Perception filter variants
+ablation_filters:
+  - name: sobel_only
+    model.perception_filters: [sobel_x, sobel_y, identity]
+  - name: laplacian
+    model.perception_filters: [sobel_x, sobel_y, laplacian, identity]
+  - name: identity_only
+    model.perception_filters: [identity]
+  - name: learned
+    model.learnable_filters: true
+  - name: sobel_no_identity
+    model.perception_filters: [sobel_x, sobel_y]
+
+# A3: Stochastic update rate
+ablation_stochastic:
+  model.stochastic_rate: [0.3, 0.5, 0.7, 1.0]
+
+# A4: Update MLP hidden dim
+ablation_hidden_dim:
+  model.update_hidden_dim: [128, 256, 384, 512]
+
+# A5: Network depth
+ablation_depth:
+  model.depth: [6, 8, 10, 12]
+
+# A6: CLS token strategy
+ablation_cls:
+  model.cls_strategy: [exclude, broadcast, gap]
+
+# A7: Hybrid NCA/attn split
+ablation_hybrid_split:
+  - model.nca_depth: 3
+    model.attn_depth: 9
+  - model.nca_depth: 6
+    model.attn_depth: 6
+  - model.nca_depth: 9
+    model.attn_depth: 3
+  - model.nca_depth: 12
+    model.attn_depth: 0
