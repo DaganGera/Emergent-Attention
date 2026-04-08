@@ -216,6 +216,9 @@ class Trainer:
         for epoch in range(self.start_epoch, self.total_epochs):
             train_metrics = self.train_one_epoch(epoch)
             self.scheduler.step()
+            # Release any fragmented CUDA memory before evaluation + checkpointing
+            if self.device.type == "cuda":
+                torch.cuda.empty_cache()
 
             log = {"epoch": epoch, "train/loss": train_metrics["loss"],
                    "train/acc": train_metrics["acc"], "train/lr": self.optimizer.param_groups[0]["lr"]}
