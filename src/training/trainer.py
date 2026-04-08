@@ -14,7 +14,6 @@ import os
 import time
 import torch
 import torch.nn as nn
-from torch.cuda.amp import autocast, GradScaler
 from torch.utils.data import DataLoader
 from timm.utils import ModelEmaV3
 
@@ -83,7 +82,8 @@ class Trainer:
 
         # AMP
         self.use_amp = train_cfg.amp and device.type == "cuda"
-        self.scaler = GradScaler(enabled=self.use_amp)
+        self._amp_device = device.type  # "cuda" or "cpu"
+        self.scaler = torch.amp.GradScaler(enabled=self.use_amp)
 
         # EMA
         self.ema_model: ModelEmaV3 | None = None
@@ -118,7 +118,7 @@ class Trainer:
 
             self.optimizer.zero_grad()
 
-            with autocast(enabled=self.use_amp):
+            with torch.amp.autocast(device_type=self._amp_device, enabled=self.use_amp):
                 outputs = self.model(images)
                 loss = self.criterion(outputs, targets)
 
@@ -179,7 +179,7 @@ class Trainer:
             images = images.to(self.device, non_blocking=True)
             targets = targets.to(self.device, non_blocking=True)
 
-            with autocast(enabled=self.use_amp):
+            with torch.amp.autocast(device_type=self._amp_device, enabled=self.use_amp):
                 outputs = eval_model(images)
 
             # Top-1
