@@ -204,7 +204,9 @@ class Trainer:
         if state.get("scheduler") is not None:
             self.scheduler.load_state_dict(state["scheduler"])
         if self.ema_model is not None and "ema_model" in state:
-            self.ema_model.load_state_dict(state["ema_model"])
+            # Checkpoint stores ema_model.module.state_dict() (no "module." prefix),
+            # so load into .module, not the EmaV3 wrapper itself.
+            self.ema_model.module.load_state_dict(state["ema_model"])
         self.start_epoch = state["epoch"] + 1
         self.best_acc = state["best_acc"]
         print(f"Resumed from epoch {self.start_epoch}, best_acc={self.best_acc:.2f}%")
