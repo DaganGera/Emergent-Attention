@@ -98,6 +98,11 @@ class HybridNCAViT(nn.Module):
         self.Wp = img_size // patch_size
         self.num_patches = self.Hp * self.Wp
 
+        # Auto-adjust num_heads to be divisible into embed_dim
+        while embed_dim % num_heads != 0:
+            num_heads -= 1
+        num_heads = max(num_heads, 1)
+
         # Patch embedding
         self.patch_embed = nn.Conv2d(
             in_chans, embed_dim, kernel_size=patch_size, stride=patch_size, bias=False
@@ -150,6 +155,10 @@ class HybridNCAViT(nn.Module):
             elif isinstance(m, nn.LayerNorm):
                 nn.init.ones_(m.weight)
                 nn.init.zeros_(m.bias)
+        # Preserve zero-init on NCA output layers (trunc_normal_ above overwrites them)
+        for block in self.nca_blocks:
+            nn.init.zeros_(block.nca_attn.linear2.weight)
+            nn.init.zeros_(block.nca_attn.linear2.bias)
 
     def forward(self, img: torch.Tensor) -> torch.Tensor:
         """
@@ -176,6 +185,7 @@ class HybridNCAViT(nn.Module):
         for block in self.attn_blocks:
             x = block(x)
 
-        # CLS → head
+        # GAP over patch tokens for classification
+        # (CLS is excluded from NCA and MLP is token-wise → CLS is image-blind)
         x = self.norm(x)
-        return self.head(x[:, 0])
+        return self.head(x[:, 1:].mean(dim=1))

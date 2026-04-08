@@ -55,8 +55,11 @@ class Trainer:
         self.device = device
         self.output_dir = output_dir
 
-        train_cfg = cfg.training
-        aug_cfg = train_cfg.augmentation
+        # cfg.training = entire default.yaml; nested keys:
+        #   .optimizer, .scheduler, .training (hyperparams), .augmentation
+        train_cfg = cfg.training.training   # the training: block in default.yaml
+        aug_cfg = cfg.training.augmentation
+        sched_cfg = cfg.training.scheduler
 
         # Optimizer and scheduler
         self.optimizer = build_optimizer(model, cfg)
@@ -90,7 +93,7 @@ class Trainer:
         # Training state
         self.start_epoch = 0
         self.best_acc = 0.0
-        self.total_epochs = train_cfg.scheduler.epochs
+        self.total_epochs = sched_cfg.epochs
         self.grad_clip = train_cfg.grad_clip
         self.checkpoint_freq = train_cfg.checkpoint_freq
         self.eval_freq = train_cfg.eval_freq

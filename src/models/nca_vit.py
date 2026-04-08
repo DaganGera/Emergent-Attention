@@ -117,9 +117,8 @@ class NCAViT(nn.Module):
     ) -> None:
         super().__init__()
 
-        assert cls_strategy == "exclude", (
-            "Only 'exclude' CLS strategy is implemented. "
-            "'broadcast' and 'gap' are ablation variants (A6)."
+        assert cls_strategy in ("exclude", "gap"), (
+            f"Unknown cls_strategy '{cls_strategy}'. Use 'exclude' or 'gap'."
         )
 
         self.num_classes = num_classes
@@ -179,6 +178,11 @@ class NCAViT(nn.Module):
             elif isinstance(m, nn.LayerNorm):
                 nn.init.ones_(m.weight)
                 nn.init.zeros_(m.bias)
+        # Re-apply zero-init to NCA output layers (trunc_normal_ above overwrites them)
+        # Zero-init keeps delta≈0 at start of training for stability
+        for block in self.blocks:
+            nn.init.zeros_(block.nca_attn.linear2.weight)
+            nn.init.zeros_(block.nca_attn.linear2.bias)
 
     def forward_features(self, img: torch.Tensor) -> torch.Tensor:
         """
@@ -207,7 +211,12 @@ class NCAViT(nn.Module):
         # Final norm
         x = self.norm(x)
 
-        return x[:, 0]  # CLS token: (B, D)
+        if self.cls_strategy == "gap":
+            # Global Average Pooling over patch tokens
+            return x[:, 1:].mean(dim=1)   # (B, D)
+        # "exclude": CLS never participated in NCA → use GAP since CLS is image-blind
+        # (token-wise MLP provides no cross-token mixing, so CLS can't aggregate patches)
+        return x[:, 1:].mean(dim=1)   # (B, D)
 
     def forward(self, img: torch.Tensor) -> torch.Tensor:
         """

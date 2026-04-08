@@ -78,10 +78,13 @@ class TestCLSTokenBehavior:
             "CLS token was modified — should pass through unchanged"
         )
 
-    def test_patch_tokens_are_modified(self, nca_tiny, sample_input):
+    def test_patch_tokens_are_modified(self, sample_input):
         """Patch tokens should change after NCA update (non-trivial computation)."""
-        nca_tiny.eval()  # deterministic
-        out = nca_tiny(sample_input)
+        # Use non-zero linear2 — at zero-init, delta=0 so output equals input (by design)
+        block = NCAAttention(dim=192, nca_steps=4, hidden_dim=384, grid_size=(14, 14))
+        torch.nn.init.normal_(block.linear2.weight, std=0.1)
+        block.eval()  # deterministic
+        out = block(sample_input)
         patches_in = sample_input[:, 1:, :]
         patches_out = out[:, 1:, :]
         assert not torch.allclose(patches_in, patches_out, atol=1e-4), (
@@ -100,7 +103,12 @@ class TestGradientFlow:
         loss.backward()
         for name, param in nca_tiny.named_parameters():
             assert param.grad is not None, f"No gradient for parameter: {name}"
-            assert param.grad.abs().sum() > 0, f"Zero gradient for parameter: {name}"
+        # Note: linear1 has zero gradients at init because linear2.weight=0 blocks
+        # backward through it. This is correct — linear2 gets gradients and starts
+        # learning first, after which linear1 receives non-zero gradients.
+        assert nca_tiny.linear2.weight.grad.abs().sum() > 0, (
+            "linear2.weight should always have non-zero gradient"
+        )
 
     def test_input_gradient_flows(self, nca_tiny):
         x = torch.randn(2, 197, 192, requires_grad=True)
@@ -153,12 +161,15 @@ class TestZeroInit:
 
 class TestStochasticUpdate:
 
-    def test_training_nondeterministic(self, nca_tiny, sample_input):
+    def test_training_nondeterministic(self, sample_input):
         """Two training forward passes should differ (stochastic mask)."""
-        nca_tiny.train()
-        out1 = nca_tiny(sample_input)
-        out2 = nca_tiny(sample_input)
-        # With stochastic_rate=0.5, outputs should differ (modulo very rare equality)
+        # Use a block with non-zero linear2 weights so the stochastic mask has effect.
+        # (With zero-init linear2, delta=0 everywhere so mask*0=0 — identical outputs.)
+        block = NCAAttention(dim=192, nca_steps=4, hidden_dim=384, grid_size=(14, 14))
+        torch.nn.init.normal_(block.linear2.weight, std=0.1)  # non-zero delta
+        block.train()
+        out1 = block(sample_input)
+        out2 = block(sample_input)
         assert not torch.allclose(out1, out2, atol=1e-6), (
             "Training outputs identical — stochastic mask may not be working"
         )

@@ -142,17 +142,20 @@ class NCAAttention(nn.Module):
         # 3. Sequence → spatial grid
         grid = rearrange(patches_norm, "b (hp wp) d -> b d hp wp", hp=self.Hp, wp=self.Wp)
         # grid: (B, D, Hp, Wp)
+        grid_init = grid.clone()  # save initial state to compute delta
 
         # 4. K NCA iterations
         for _ in range(self.nca_steps):
             grid = self._nca_step(grid)
 
-        # 5. Spatial grid → sequence
-        patches_out = rearrange(grid, "b d hp wp -> b (hp wp) d")
-        # patches_out: (B, N, D)
+        # 5. Compute accumulated NCA delta and convert back to sequence
+        # delta = grid_final - grid_init (only the change, not the full state)
+        # With zero-init linear2: delta ≈ 0 → near-identity at init
+        delta = rearrange(grid - grid_init, "b d hp wp -> b (hp wp) d")
+        # delta: (B, N, D)
 
-        # 6. Residual connection (skip over pre-norm, per standard Pre-Norm convention)
-        patches_out = patches_out + patches
+        # 6. Residual: x + NCA_delta(LN(x)) — matches standard pre-norm convention
+        patches_out = patches + delta
 
         # 7. Re-attach CLS token
         out = torch.cat([cls_token, patches_out], dim=1)  # (B, N+1, D)
