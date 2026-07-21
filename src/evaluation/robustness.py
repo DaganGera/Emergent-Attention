@@ -14,7 +14,6 @@ from torch.utils.data import DataLoader
 import torchattacks
 
 
-@torch.no_grad()
 def _eval_on_attacked(
     model: nn.Module,
     attack,
@@ -31,7 +30,7 @@ def _eval_on_attacked(
             break
         images = images.to(device)
         targets = targets.to(device)
-        adv_images = attack(images, targets)
+        adv_images = attack(images, targets)  # requires grad internally
         with torch.no_grad():
             preds = model(adv_images).argmax(1)
         correct += (preds == targets).sum().item()

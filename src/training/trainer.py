@@ -232,7 +232,9 @@ class Trainer:
                 is_best = val_metrics["top1"] > self.best_acc
                 if is_best:
                     self.best_acc = val_metrics["top1"]
-                    save_best_model(self.model, os.path.join(self.output_dir, "best.pt"))
+                    # Save EMA model as best when available (matches evaluation)
+                    best_model = self.ema_model.module if self.ema_model is not None else self.model
+                    save_best_model(best_model, os.path.join(self.output_dir, "best.pt"))
 
                 print(
                     f"Epoch [{epoch+1}/{self.total_epochs}]  "

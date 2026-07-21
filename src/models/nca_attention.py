@@ -154,12 +154,9 @@ class NCAAttention(nn.Module):
         delta = rearrange(grid - grid_init, "b d hp wp -> b (hp wp) d")
         # delta: (B, N, D)
 
-        # 6. Residual: x + NCA_delta(LN(x)) — matches standard pre-norm convention
-        patches_out = patches + delta
-
-        # 7. Re-attach CLS token
-        out = torch.cat([cls_token, patches_out], dim=1)  # (B, N+1, D)
-        return out
+        # 6. Return delta with zero CLS delta — caller handles residual + DropPath
+        cls_zero = torch.zeros_like(cls_token)
+        return torch.cat([cls_zero, delta], dim=1)  # (B, N+1, D)
 
     def extra_repr(self) -> str:
         return (

@@ -15,6 +15,7 @@ import math
 import torch
 import torch.nn as nn
 from einops import rearrange, repeat
+from timm.layers import DropPath
 
 from src.models.nca_attention import NCAAttention
 
@@ -53,6 +54,8 @@ class NCAViTBlock(nn.Module):
         grid_size: tuple[int, int],
         mlp_ratio: float = 4.0,
         learnable_filters: bool = False,
+        drop: float = 0.0,
+        drop_path: float = 0.0,
     ) -> None:
         super().__init__()
         self.nca_attn = NCAAttention(
@@ -65,13 +68,15 @@ class NCAViTBlock(nn.Module):
             learnable_filters=learnable_filters,
         )
         self.norm2 = nn.LayerNorm(dim)
-        self.mlp = MLP(dim=dim, mlp_ratio=mlp_ratio)
+        self.mlp = MLP(dim=dim, mlp_ratio=mlp_ratio, drop=drop)
+        self.drop_path1 = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+        self.drop_path2 = DropPath(drop_path) if drop_path > 0. else nn.Identity()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # NCAAttention applies pre-norm internally and adds residual
-        x = self.nca_attn(x)
-        # Standard MLP block with pre-norm and residual
-        x = x + self.mlp(self.norm2(x))
+        # NCAAttention returns delta (no residual) — apply DropPath then add
+        x = x + self.drop_path1(self.nca_attn(x))
+        # Standard MLP block with pre-norm, DropPath, and residual
+        x = x + self.drop_path2(self.mlp(self.norm2(x)))
         return x
 
 
@@ -113,6 +118,7 @@ class NCAViT(nn.Module):
         cls_strategy: str = "exclude",
         learnable_filters: bool = False,
         drop_rate: float = 0.0,
+        drop_path_rate: float = 0.0,
         pos_drop_rate: float = 0.0,
     ) -> None:
         super().__init__()
@@ -143,7 +149,8 @@ class NCAViT(nn.Module):
         self.pos_embed = nn.Parameter(torch.zeros(1, self.num_patches + 1, embed_dim))
         self.pos_drop = nn.Dropout(pos_drop_rate)
 
-        # 4. Transformer blocks
+        # 4. Transformer blocks (linearly increasing drop path rate)
+        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]
         self.blocks = nn.ModuleList([
             NCAViTBlock(
                 dim=embed_dim,
@@ -154,8 +161,10 @@ class NCAViT(nn.Module):
                 grid_size=(self.Hp, self.Wp),
                 mlp_ratio=mlp_ratio,
                 learnable_filters=learnable_filters,
+                drop=drop_rate,
+                drop_path=dpr[i],
             )
-            for _ in range(depth)
+            for i in range(depth)
         ])
 
         # 5. Final norm + classification head

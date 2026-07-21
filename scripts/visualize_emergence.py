@@ -19,6 +19,7 @@ import matplotlib.animation as animation
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.models.nca_vit import NCAViT
+from src.models.hybrid_nca_vit import HybridNCAViT
 from src.evaluation.visualization import (
     receptive_field_growth,
     plot_receptive_field_growth,
@@ -77,6 +78,9 @@ def save_emergence_animation(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint", required=True, help="Path to model checkpoint")
+    parser.add_argument("--model", default="nca_vit_hybrid",
+                        choices=["nca_vit_tiny", "nca_vit_hybrid"],
+                        help="Model type (default: nca_vit_hybrid)")
     parser.add_argument("--output-dir", default="figures", help="Where to save figures")
     parser.add_argument("--animate", action="store_true", help="Also produce emergence GIF")
     parser.add_argument("--block-idx", type=int, default=0,
@@ -87,14 +91,26 @@ def main():
     os.makedirs(args.output_dir, exist_ok=True)
 
     # Load model
-    model = NCAViT().to(device)
+    if args.model == "nca_vit_hybrid":
+        model = HybridNCAViT(
+            num_classes=100, embed_dim=192, nca_depth=6, attn_depth=6,
+            nca_steps=4, filter_names=["sobel_x", "sobel_y", "identity"],
+            nca_hidden_dim=384, stochastic_rate=0.5, mlp_ratio=4.0,
+            drop_rate=0.1, drop_path_rate=0.1, learnable_filters=True,
+        ).to(device)
+    else:
+        model = NCAViT().to(device)
+
     state = load_checkpoint(args.checkpoint)
     model.load_state_dict(state["model"] if "model" in state else state)
     model.eval()
-    print(f"Loaded model from {args.checkpoint}")
+    print(f"Loaded {args.model} from {args.checkpoint}")
 
-    # Get the requested NCA block
-    nca_block = model.blocks[args.block_idx].nca_attn
+    # Get the requested NCA block — hybrid uses nca_blocks, pure NCA uses blocks
+    if args.model == "nca_vit_hybrid":
+        nca_block = model.nca_blocks[args.block_idx].nca_attn
+    else:
+        nca_block = model.blocks[args.block_idx].nca_attn
     embed_dim = model.embed_dim
     grid_size = (model.Hp, model.Wp)
 

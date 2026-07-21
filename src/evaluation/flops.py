@@ -48,7 +48,7 @@ def count_parameters(model: nn.Module) -> dict:
     """
     total = sum(p.numel() for p in model.parameters())
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    by_module = {k: v.item() for k, v in parameter_count(model).items()}
+    by_module = {k: int(v) for k, v in parameter_count(model).items()}
     return {"total": total, "trainable": trainable, "by_module": by_module}
 
 
@@ -83,7 +83,7 @@ def measure_throughput(
     # Warmup
     with torch.no_grad():
         for _ in range(n_warmup):
-            _ = model(dummy)
+            model(dummy)
 
     if device.type == "cuda":
         torch.cuda.synchronize()
@@ -91,7 +91,7 @@ def measure_throughput(
     t0 = time.perf_counter()
     with torch.no_grad():
         for _ in range(n_measure):
-            _ = model(dummy)
+            model(dummy)
 
     if device.type == "cuda":
         torch.cuda.synchronize()

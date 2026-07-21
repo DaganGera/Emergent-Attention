@@ -21,19 +21,52 @@ import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import torchvision
+import torchvision.transforms as T
+from torch.utils.data import DataLoader
+
 from src.models.nca_vit import NCAViT
 from src.models.hybrid_nca_vit import HybridNCAViT
 from src.models.baselines import create_baseline
-from src.data.datasets import build_cifar100_loaders, build_imagenet100_loaders
 from src.evaluation.metrics import evaluate_accuracy
 from src.evaluation.flops import count_flops, count_parameters, measure_throughput
 from src.evaluation.robustness import evaluate_robustness
 from src.utils.checkpoint import load_checkpoint
 
 
+_CIFAR100_MEAN = (0.5071, 0.4867, 0.4408)
+_CIFAR100_STD  = (0.2675, 0.2565, 0.2761)
+
+
+def _build_val_loader(dataset: str, batch_size: int, img_size: int = 224) -> DataLoader:
+    if dataset == "cifar100":
+        transform = T.Compose([
+            T.Resize(img_size, interpolation=T.InterpolationMode.BICUBIC),
+            T.ToTensor(),
+            T.Normalize(_CIFAR100_MEAN, _CIFAR100_STD),
+        ])
+        ds = torchvision.datasets.CIFAR100(root="./data", train=False, download=True, transform=transform)
+    else:
+        raise ValueError(f"Unsupported dataset: {dataset}")
+    return DataLoader(ds, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=False)
+
+
 MODEL_BUILDERS = {
     "nca_vit_tiny": lambda nc: NCAViT(num_classes=nc),
-    "nca_vit_hybrid": lambda nc: HybridNCAViT(num_classes=nc),
+    "nca_vit_hybrid": lambda nc: HybridNCAViT(
+        num_classes=nc,
+        embed_dim=192,
+        nca_depth=6,
+        attn_depth=6,
+        nca_steps=4,
+        filter_names=["sobel_x", "sobel_y", "identity"],
+        nca_hidden_dim=384,
+        stochastic_rate=0.5,
+        mlp_ratio=4.0,
+        drop_rate=0.1,
+        drop_path_rate=0.1,
+        learnable_filters=True,
+    ),
     "vit_tiny": lambda nc: create_baseline("vit_tiny", num_classes=nc),
     "deit_tiny": lambda nc: create_baseline("deit_tiny", num_classes=nc),
     "swin_tiny": lambda nc: create_baseline("swin_tiny", num_classes=nc),
@@ -68,10 +101,7 @@ def main():
     print(f"Loaded checkpoint: {args.checkpoint}")
 
     # Data
-    if args.dataset == "cifar100":
-        _, val_loader = build_cifar100_loaders(batch_size=args.batch_size)
-    else:
-        _, val_loader = build_imagenet100_loaders(batch_size=args.batch_size)
+    val_loader = _build_val_loader(args.dataset, batch_size=args.batch_size)
 
     results = {"model": args.model, "dataset": args.dataset, "checkpoint": args.checkpoint}
 

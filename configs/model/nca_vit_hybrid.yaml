@@ -18,3 +18,6 @@ stochastic_rate: 0.5
 update_hidden_dim: 384
 cls_strategy: exclude
 mlp_ratio: 4.0
+drop_rate: 0.1
+drop_path_rate: 0.1
+learnable_filters: true

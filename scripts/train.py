@@ -45,9 +45,11 @@ def main(cfg: DictConfig) -> None:
     print(f"Device: {device}")
     if device.type == "cuda":
         print(f"GPU: {torch.cuda.get_device_name(0)}")
+        torch.set_float32_matmul_precision("high")
 
     # Model
     model = build_model(cfg.model)
+
     total_params = sum(p.numel() for p in model.parameters())
     print(f"Parameters: {total_params:,}")
 

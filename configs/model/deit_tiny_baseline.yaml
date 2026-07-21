@@ -1,0 +1,4 @@
+# DeiT-Tiny baseline (from timm)
+name: deit_tiny_patch16_224
+num_classes: 100
+pretrained: false

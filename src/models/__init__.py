@@ -33,6 +33,8 @@ def build_model(cfg) -> "torch.nn.Module":
             stochastic_rate=cfg.get("stochastic_rate", 0.5),
             mlp_ratio=cfg.get("mlp_ratio", 4.0),
             cls_strategy=cfg.get("cls_strategy", "exclude"),
+            drop_rate=cfg.get("drop_rate", 0.0),
+            drop_path_rate=cfg.get("drop_path_rate", 0.0),
         )
 
     elif name == "nca_vit_hybrid":
@@ -46,6 +48,9 @@ def build_model(cfg) -> "torch.nn.Module":
             nca_hidden_dim=cfg.get("update_hidden_dim", 384),
             stochastic_rate=cfg.get("stochastic_rate", 0.5),
             mlp_ratio=cfg.get("mlp_ratio", 4.0),
+            drop_rate=cfg.get("drop_rate", 0.0),
+            drop_path_rate=cfg.get("drop_path_rate", 0.0),
+            learnable_filters=cfg.get("learnable_filters", False),
         )
 
     else:
