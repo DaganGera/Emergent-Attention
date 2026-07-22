@@ -1,6 +1,6 @@
-# Data and checkpoints
-data/
-checkpoints/
+# Data and checkpoints (root-level only — do NOT match src/data or configs/data)
+/data/
+/checkpoints/
 *.pt
 *.pth
 
