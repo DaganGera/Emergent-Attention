@@ -8,9 +8,37 @@ from torch.utils.data import DataLoader
 import torchvision
 import torchvision.transforms as T
 
+from src.data.plantvillage import build_plantvillage_datasets
+
 
 _CIFAR100_MEAN = (0.5071, 0.4867, 0.4408)
 _CIFAR100_STD  = (0.2675, 0.2565, 0.2761)
+
+# ImageNet stats -- standard default for natural (non-CIFAR-scale) RGB photos
+_PLANTVILLAGE_MEAN = (0.485, 0.456, 0.406)
+_PLANTVILLAGE_STD  = (0.229, 0.224, 0.225)
+
+
+def _build_plantvillage_train_transform(img_size: int) -> T.Compose:
+    # Native images are ~256x256, not CIFAR's 32x32, so this crops/resizes
+    # rather than upsampling from a tiny source like the CIFAR-100 path does.
+    return T.Compose([
+        T.RandomResizedCrop(img_size, scale=(0.8, 1.0), interpolation=T.InterpolationMode.BICUBIC),
+        T.RandomHorizontalFlip(),
+        T.RandAugment(num_ops=2, magnitude=9),
+        T.ToTensor(),
+        T.Normalize(_PLANTVILLAGE_MEAN, _PLANTVILLAGE_STD),
+        T.RandomErasing(p=0.25),
+    ])
+
+
+def _build_plantvillage_val_transform(img_size: int) -> T.Compose:
+    return T.Compose([
+        T.Resize(int(img_size * 1.14), interpolation=T.InterpolationMode.BICUBIC),
+        T.CenterCrop(img_size),
+        T.ToTensor(),
+        T.Normalize(_PLANTVILLAGE_MEAN, _PLANTVILLAGE_STD),
+    ])
 
 
 def _build_train_transform(img_size: int) -> T.Compose:
@@ -51,21 +79,26 @@ def build_loaders(cfg) -> tuple[DataLoader, DataLoader]:
     pin_memory = data_cfg.get("pin_memory", True)
 
     dataset_name = data_cfg.dataset.lower()
-    if dataset_name != "cifar100":
-        raise ValueError(f"Unsupported dataset: {dataset_name}. Only 'cifar100' is supported.")
-
-    train_dataset = torchvision.datasets.CIFAR100(
-        root=root,
-        train=True,
-        download=True,
-        transform=_build_train_transform(img_size),
-    )
-    val_dataset = torchvision.datasets.CIFAR100(
-        root=root,
-        train=False,
-        download=True,
-        transform=_build_val_transform(img_size),
-    )
+    if dataset_name == "cifar100":
+        train_dataset = torchvision.datasets.CIFAR100(
+            root=root,
+            train=True,
+            download=True,
+            transform=_build_train_transform(img_size),
+        )
+        val_dataset = torchvision.datasets.CIFAR100(
+            root=root,
+            train=False,
+            download=True,
+            transform=_build_val_transform(img_size),
+        )
+    elif dataset_name == "plantvillage":
+        train_dataset, val_dataset = build_plantvillage_datasets(
+            train_transform=_build_plantvillage_train_transform(img_size),
+            val_transform=_build_plantvillage_val_transform(img_size),
+        )
+    else:
+        raise ValueError(f"Unsupported dataset: {dataset_name}. Supported: 'cifar100', 'plantvillage'.")
 
     train_loader = DataLoader(
         train_dataset,
