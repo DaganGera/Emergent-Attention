@@ -3,3 +3,9 @@ data_root: ./data
 batch_size: 64
 num_workers: 4
 pin_memory: true
+
+# Data-efficiency sweep: fraction of the train split to keep (1.0 = all 50k).
+# Stratified by class; subsample_seed is held fixed across architectures so
+# every model at a given fraction trains on the identical images.
+train_fraction: 1.0
+subsample_seed: 42

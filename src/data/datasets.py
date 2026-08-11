@@ -3,8 +3,9 @@ Dataset loaders for NCA-ViT experiments.
 Supports CIFAR-100 with 224x224 resizing to match ViT patch grids.
 """
 
+import numpy as np
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 import torchvision
 import torchvision.transforms as T
 
@@ -61,6 +62,40 @@ def _build_val_transform(img_size: int) -> T.Compose:
     ])
 
 
+def _subsample_train(dataset, fraction: float, seed: int = 42):
+    """
+    Class-stratified subsample of a training set, for data-efficiency sweeps.
+
+    The seed is fixed and deliberately independent of the training seed, so
+    every model compared at a given fraction sees the exact same images --
+    otherwise the curve measures which subset was drawn, not which architecture
+    learns from less data.
+    """
+    if fraction >= 1.0:
+        return dataset
+
+    targets = getattr(dataset, "targets", None)
+    if targets is None:
+        targets = getattr(dataset, "labels", None)
+    if targets is None:
+        raise ValueError(
+            "Dataset exposes neither .targets nor .labels; cannot stratify subsample."
+        )
+    targets = np.asarray(targets)
+
+    rng = np.random.default_rng(seed)
+    keep = []
+    for cls in np.unique(targets):
+        idx = np.flatnonzero(targets == cls)
+        n = max(1, int(round(len(idx) * fraction)))
+        keep.append(rng.choice(idx, size=n, replace=False))
+    keep = np.sort(np.concatenate(keep)).tolist()
+
+    print(f"[data] train_fraction={fraction} -> {len(keep)}/{len(targets)} images "
+          f"({len(np.unique(targets))} classes, stratified, subsample_seed={seed})")
+    return Subset(dataset, keep)
+
+
 def build_loaders(cfg) -> tuple[DataLoader, DataLoader]:
     """
     Build train and validation DataLoaders.
@@ -99,6 +134,15 @@ def build_loaders(cfg) -> tuple[DataLoader, DataLoader]:
         )
     else:
         raise ValueError(f"Unsupported dataset: {dataset_name}. Supported: 'cifar100', 'plantvillage'.")
+
+    # Data-efficiency sweeps: keep only a stratified slice of the train split.
+    # The val split is never subsampled -- every point on the curve is scored
+    # against the identical test set.
+    train_dataset = _subsample_train(
+        train_dataset,
+        float(data_cfg.get("train_fraction", 1.0)),
+        seed=int(data_cfg.get("subsample_seed", 42)),
+    )
 
     train_loader = DataLoader(
         train_dataset,
