@@ -23,9 +23,12 @@ not pending. This has already been committed and pushed to `origin/main` (commit
 **Also done since this plan was written:** PlantVillage dataset support was added to
 `src/data/plantvillage.py` + `configs/data/plantvillage.yaml` and is in `origin/main` too.
 
-**Your next task is Step 12 below (NCA depth K ablation) — the one remaining gap the paper
-explicitly flags as not yet ablated.** Steps 1–7 (environment, GPU, clone) you've already done once;
-skip straight to `git pull` (see Step 12) if this machine still has the conda env from before.
+**Your next task is Step 13 — the data-efficiency sweep. Go there now. Step 12 (K ablation) is
+DEFERRED** — it is a paper-completeness footnote, whereas Step 13 produces the central figure for
+both the paper and the patent filing. Do Step 12 only if Step 13 finishes and lab time remains.
+
+Steps 1–7 (environment, GPU, clone) you've already done once; skip straight to the `git pull` in
+Step 13a if this machine still has the conda env from before.
 
 ---
 
@@ -235,3 +238,135 @@ Don't commit `outputs/exp/**/checkpoints/` (large binaries, not needed — the l
 **12e — Tell the home PC.** Once pushed, say so — the K-depth table needs to be added to `paper.md`
 §5.4 (replacing "NCA depth K — only K=4 has been run" with the real K∈{1,2,4,8} curve), which should
 happen on whichever machine is talking to you next.
+
+---
+
+## Step 13 — Data-efficiency sweep (**THE PRIORITY TASK — start here**)
+
+### Why this run (read before starting)
+
+Every result so far points at the same thing, but none of them measures it directly:
+
+| dataset | train size | Hybrid vs DeiT |
+|---|---:|---|
+| PlantVillage | ~46,000 (clean, saturated) | ~0 |
+| CIFAR-100 | 50,000 | +8.4 |
+| PlantDoc | 2,176 (real-world, noisy) | +3.22 |
+| MVTec bottle | ~200 | DeiT never converged (45.0%); Hybrid did (71.67%) |
+
+Hypothesis: **attention must learn locality from data; the NCA's fixed Sobel perception already is
+locality.** With enough data attention catches up and the advantage disappears; with scarce data it
+never gets there. This sweep tests that on one dataset with everything else held constant, by
+varying only how much of CIFAR-100 the model is allowed to see.
+
+Expected shape: a large gap at 5–10% that narrows toward 100%. **A flat curve falsifies the
+hypothesis** — that is a real outcome, report it as-is, do not tune to rescue it.
+
+### Step 13a — Sync first (a new flag landed; the sweep will not run without it)
+
+```powershell
+cd C:\Emergent-Attention
+git pull origin main
+git log --oneline -3
+```
+
+Must show `96cebc7` (or later) — "Add stratified train_fraction subsampling". Verify:
+
+```powershell
+python -c "import yaml; c=yaml.safe_load(open('configs/data/cifar100.yaml')); print('train_fraction' in c)"
+```
+Must print `True`. If not, the pull failed — stop and fix it.
+
+### Step 13b — Invariants (unchanged)
+
+300 epochs · batch_size 64 · seed 42 · `configs/training/default.yaml` untouched. The **only** new
+override is `data.train_fraction`. The val split is never subsampled, so every point on the curve is
+scored on the identical 10,000-image test set.
+
+`data.subsample_seed=42` is fixed and separate from the training seed: at a given fraction, Hybrid
+and DeiT train on the **exact same images**. Do not change it, or the curve measures which subset
+got drawn instead of which architecture learns from less data.
+
+### Step 13c — Run these 8 jobs, in this order, one at a time
+
+Order matters: smallest fractions are both the **fastest** and the **most decisive**. If lab time
+runs out you still hold the informative left half of the curve.
+
+```powershell
+$env:WANDB_MODE="disabled"; cd C:\Emergent-Attention
+
+# --- 5% (2,500 images) — fastest, most decisive ---
+python scripts/train.py model=nca_vit_hybrid data=cifar100 data.train_fraction=0.05 `
+  data.data_root=C:/Emergent-Attention/data data.batch_size=64 `
+  hydra.job.chdir=true hydra.run.dir=outputs/exp/frac05_hybrid | Tee-Object outputs\frac05_hybrid.log
+
+python scripts/train.py model=deit_tiny_baseline data=cifar100 data.train_fraction=0.05 `
+  data.data_root=C:/Emergent-Attention/data data.batch_size=64 `
+  hydra.job.chdir=true hydra.run.dir=outputs/exp/frac05_deit | Tee-Object outputs\frac05_deit.log
+
+# --- 10% (5,000 images) ---
+python scripts/train.py model=nca_vit_hybrid data=cifar100 data.train_fraction=0.10 `
+  data.data_root=C:/Emergent-Attention/data data.batch_size=64 `
+  hydra.job.chdir=true hydra.run.dir=outputs/exp/frac10_hybrid | Tee-Object outputs\frac10_hybrid.log
+
+python scripts/train.py model=deit_tiny_baseline data=cifar100 data.train_fraction=0.10 `
+  data.data_root=C:/Emergent-Attention/data data.batch_size=64 `
+  hydra.job.chdir=true hydra.run.dir=outputs/exp/frac10_deit | Tee-Object outputs\frac10_deit.log
+
+# --- 25% (12,500 images) ---
+python scripts/train.py model=nca_vit_hybrid data=cifar100 data.train_fraction=0.25 `
+  data.data_root=C:/Emergent-Attention/data data.batch_size=64 `
+  hydra.job.chdir=true hydra.run.dir=outputs/exp/frac25_hybrid | Tee-Object outputs\frac25_hybrid.log
+
+python scripts/train.py model=deit_tiny_baseline data=cifar100 data.train_fraction=0.25 `
+  data.data_root=C:/Emergent-Attention/data data.batch_size=64 `
+  hydra.job.chdir=true hydra.run.dir=outputs/exp/frac25_deit | Tee-Object outputs\frac25_deit.log
+
+# --- 50% (25,000 images) ---
+python scripts/train.py model=nca_vit_hybrid data=cifar100 data.train_fraction=0.50 `
+  data.data_root=C:/Emergent-Attention/data data.batch_size=64 `
+  hydra.job.chdir=true hydra.run.dir=outputs/exp/frac50_hybrid | Tee-Object outputs\frac50_hybrid.log
+
+python scripts/train.py model=deit_tiny_baseline data=cifar100 data.train_fraction=0.50 `
+  data.data_root=C:/Emergent-Attention/data data.batch_size=64 `
+  hydra.job.chdir=true hydra.run.dir=outputs/exp/frac50_deit | Tee-Object outputs\frac50_deit.log
+```
+
+**100% is already done** — Hybrid 81.29%, DeiT 72.89%. Do not re-run it.
+
+At the start of each run the log must print a line like
+`[data] train_fraction=0.05 -> 2500/50000 images (100 classes, stratified, subsample_seed=42)`.
+If that line is missing, the flag did not take effect — stop, re-check Step 13a.
+
+Cost: fractions sum to 0.9 per model, so all 8 runs ≈ **1.8 full-length trainings**. The 5% pair
+should finish inside a single lab session.
+
+**Expected absolute numbers are low** at small fractions (roughly 20–40% top-1) — 300 epochs over
+2,500 images is 20× fewer gradient steps than the full run. That is fine and expected. Both models
+get an identical budget; **the gap is the result, not the absolute value.**
+
+Resume after the 3 PM shutdown by re-running that run's exact command — `latest.pt` auto-resumes.
+
+### Step 13d — Collect
+
+```powershell
+python -c "import torch,glob,os; [print(os.path.basename(os.path.dirname(p.split('checkpoints')[0].rstrip('/'))) or p, p.split('exp/')[1].split('/')[0], round(torch.load(p,map_location='cpu',weights_only=False)['best_acc'],2)) for p in sorted(glob.glob('outputs/exp/frac*/checkpoints/**/latest.pt',recursive=True))]"
+```
+
+Report as a table: fraction | Hybrid | DeiT | gap. Include the known 100% row (81.29 / 72.89 / +8.40).
+
+### Step 13e — Push results back
+
+```powershell
+cd C:\Emergent-Attention
+git add outputs/frac*.log
+git commit -m "Lab: data-efficiency sweep on CIFAR-100 (5/10/25/50%)"
+git push origin main
+```
+
+Commit **only the `.log` files** — never `outputs/exp/**/checkpoints/`, those are large binaries.
+Still do the Step 9 zip backup each day; the logs in git are the durable record of the numbers.
+
+Then tell whoever picks up next: the curve goes into `paper.md` as the data-efficiency figure, and
+into the patent draft as the demonstrated technical effect (accuracy retained under scarce labelled
+data), which is what §3(k) needs.
