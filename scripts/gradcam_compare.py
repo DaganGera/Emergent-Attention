@@ -34,6 +34,7 @@ import torchvision
 import torchvision.transforms as T
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -110,10 +111,11 @@ def load_model(spec: dict, num_classes: int, device: torch.device) -> nn.Module:
     return model
 
 
-def compute_gradcam(model: nn.Module, spec: dict, image: torch.Tensor, target_class: int) -> np.ndarray:
+def compute_gradcam(model: nn.Module, spec: dict, image: torch.Tensor, target_class: int):
     """
     image: (1, 3, H, W) already normalized, on the model's device.
-    Returns a (H, W) heatmap in [0, 1], resized to the input's spatial size.
+    Returns (cam, pred_class): a (H, W) heatmap in [0, 1] resized to the input's
+    spatial size, and the model's own top-1 prediction for that image.
     """
     activation = {}
 
@@ -125,6 +127,7 @@ def compute_gradcam(model: nn.Module, spec: dict, image: torch.Tensor, target_cl
     handle = spec["target_layer"](model).register_forward_hook(hook)
     model.zero_grad(set_to_none=True)
     logits = model(image)
+    pred_class = int(logits[0].argmax())
     score = logits[0, target_class]
     score.backward()
     handle.remove()
@@ -152,7 +155,7 @@ def compute_gradcam(model: nn.Module, spec: dict, image: torch.Tensor, target_cl
     cam = torch.nn.functional.interpolate(
         cam, size=image.shape[-2:], mode="bilinear", align_corners=False
     )[0, 0]
-    return cam.cpu().numpy()
+    return cam.cpu().numpy(), pred_class
 
 
 def overlay(base_rgb: np.ndarray, cam: np.ndarray, alpha: float = 0.45) -> np.ndarray:
@@ -164,8 +167,17 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--classes", nargs="+", default=["leopard", "bee"],
                          help="CIFAR-100 fine class names to visualize (one row each)")
+    parser.add_argument("--indices", nargs="+", type=int, default=None,
+                         help="Explicit CIFAR-100 test indices, one row each. Overrides --classes. "
+                              "Use to pick specific examples rather than the first image of a class.")
     parser.add_argument("--output", default="figures/gradcam_comparison.png")
     parser.add_argument("--data-root", default="./data")
+    parser.add_argument("--corruption", default=None,
+                         help="CIFAR-100-C corruption name (e.g. gaussian_noise). "
+                              "If set, CAMs are computed on the corrupted image instead of the clean one.")
+    parser.add_argument("--severity", type=int, default=3, choices=range(1, 6),
+                         help="CIFAR-100-C severity 1-5 (used only with --corruption)")
+    parser.add_argument("--corruption-dir", default="data/cifar-100-c/CIFAR-100-C")
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -173,15 +185,39 @@ def main():
 
     raw_test = torchvision.datasets.CIFAR100(root=args.data_root, train=False, download=True)
     class_to_idx = {name: i for i, name in enumerate(raw_test.classes)}
-    for name in args.classes:
-        if name not in class_to_idx:
-            raise ValueError(f"'{name}' is not a CIFAR-100 class. Available: {raw_test.classes}")
+    if not args.indices:
+        for name in args.classes:
+            if name not in class_to_idx:
+                raise ValueError(f"'{name}' is not a CIFAR-100 class. Available: {raw_test.classes}")
+
+    corrupted = None
+    if args.corruption:
+        # CIFAR-100-C rows are index-aligned with the clean test set, in 5 contiguous
+        # 10000-image severity blocks, so test index i at severity s lives at
+        # (s-1)*10000 + i. Same image, same label -- only the pixels are degraded.
+        npy_path = os.path.join(args.corruption_dir, f"{args.corruption}.npy")
+        if not os.path.exists(npy_path):
+            raise FileNotFoundError(f"{npy_path} not found -- download CIFAR-100-C first.")
+        corrupted = np.load(npy_path, mmap_mode="r")
 
     transform = build_val_transform(224)
+
+    if args.indices:
+        positions = [(raw_test.classes[raw_test[i][1]], raw_test[i][1], i) for i in args.indices]
+    else:
+        positions = []
+        for name in args.classes:
+            target_idx = class_to_idx[name]
+            positions.append(
+                (name, target_idx, next(i for i, (_, l) in enumerate(raw_test) if l == target_idx))
+            )
+
     rows = []
-    for name in args.classes:
-        target_idx = class_to_idx[name]
-        pil_img = next(img for img, label in raw_test if label == target_idx)
+    for name, target_idx, test_pos in positions:
+        pil_img = raw_test[test_pos][0]
+        if corrupted is not None:
+            arr = np.array(corrupted[(args.severity - 1) * 10000 + test_pos])
+            pil_img = Image.fromarray(arr)
         rows.append((name, target_idx, transform(pil_img).unsqueeze(0)))
 
     print("Loading models...")
@@ -203,14 +239,23 @@ def main():
         axes[r, 0].set_ylabel(name.replace("_", " ").title(), fontsize=13)
         axes[r, 0].set_xticks([]); axes[r, 0].set_yticks([])
         if r == 0:
-            axes[r, 0].set_title("Input", fontsize=13)
+            input_title = "Input"
+            if args.corruption:
+                input_title = f"Input\n({args.corruption.replace('_', ' ')}, sev {args.severity})"
+            axes[r, 0].set_title(input_title, fontsize=13)
 
         for c, (mname, spec) in enumerate(MODEL_SPECS.items(), start=1):
-            cam = compute_gradcam(models[mname], spec, img_t, target_idx)
+            cam, pred = compute_gradcam(models[mname], spec, img_t, target_idx)
             axes[r, c].imshow(overlay(base_rgb, cam))
             axes[r, c].set_xticks([]); axes[r, c].set_yticks([])
             if r == 0:
                 axes[r, c].set_title(mname, fontsize=13)
+            correct = (pred == target_idx)
+            axes[r, c].set_xlabel(
+                f"{'OK' if correct else 'X'}  {raw_test.classes[pred].replace('_', ' ')}",
+                fontsize=11, color=("#1a7f37" if correct else "#c92a2a"),
+                fontweight="bold", labelpad=4,
+            )
 
     plt.tight_layout()
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
