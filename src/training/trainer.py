@@ -185,8 +185,9 @@ class Trainer:
             # Top-1
             correct1 += (outputs.argmax(1) == targets).sum().item()
 
-            # Top-5
-            top5 = outputs.topk(5, dim=1).indices
+            # Top-5, clamped: datasets with fewer than 5 classes (BUSI has 3)
+            # would otherwise fail here. Matches evaluate_accuracy in metrics.py.
+            top5 = outputs.topk(min(5, outputs.size(1)), dim=1).indices
             correct5 += (top5 == targets.unsqueeze(1)).any(dim=1).sum().item()
 
             total += images.size(0)

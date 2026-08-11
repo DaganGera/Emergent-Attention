@@ -10,6 +10,7 @@ import torchvision
 import torchvision.transforms as T
 
 from src.data.plantvillage import build_plantvillage_datasets
+from src.data.busi import build_busi_datasets
 
 
 _CIFAR100_MEAN = (0.5071, 0.4867, 0.4408)
@@ -37,6 +38,32 @@ def _build_plantvillage_val_transform(img_size: int) -> T.Compose:
     return T.Compose([
         T.Resize(int(img_size * 1.14), interpolation=T.InterpolationMode.BICUBIC),
         T.CenterCrop(img_size),
+        T.ToTensor(),
+        T.Normalize(_PLANTVILLAGE_MEAN, _PLANTVILLAGE_STD),
+    ])
+
+
+def _build_busi_train_transform(img_size: int) -> T.Compose:
+    # Ultrasound frames are ~500x500 grayscale. Two deliberate differences from
+    # the PlantVillage path: no RandAugment, and no vertical flipping. Ultrasound
+    # geometry is not arbitrary -- depth runs top-to-bottom from the transducer,
+    # so a vertical flip produces an image that cannot occur. RandAugment's
+    # posterise/solarise/equalise operations distort the speckle statistics that
+    # this experiment is specifically about, so they are left out too.
+    return T.Compose([
+        T.RandomResizedCrop(img_size, scale=(0.8, 1.0), ratio=(0.9, 1.1),
+                            interpolation=T.InterpolationMode.BICUBIC),
+        T.RandomHorizontalFlip(),
+        T.ColorJitter(brightness=0.2, contrast=0.2),
+        T.ToTensor(),
+        T.Normalize(_PLANTVILLAGE_MEAN, _PLANTVILLAGE_STD),
+        T.RandomErasing(p=0.25),
+    ])
+
+
+def _build_busi_val_transform(img_size: int) -> T.Compose:
+    return T.Compose([
+        T.Resize((img_size, img_size), interpolation=T.InterpolationMode.BICUBIC),
         T.ToTensor(),
         T.Normalize(_PLANTVILLAGE_MEAN, _PLANTVILLAGE_STD),
     ])
@@ -132,8 +159,17 @@ def build_loaders(cfg) -> tuple[DataLoader, DataLoader]:
             train_transform=_build_plantvillage_train_transform(img_size),
             val_transform=_build_plantvillage_val_transform(img_size),
         )
+    elif dataset_name == "busi":
+        train_dataset, val_dataset = build_busi_datasets(
+            train_transform=_build_busi_train_transform(img_size),
+            val_transform=_build_busi_val_transform(img_size),
+            root=data_cfg.get("busi_root", "data/busi/Dataset_BUSI_with_GT"),
+        )
     else:
-        raise ValueError(f"Unsupported dataset: {dataset_name}. Supported: 'cifar100', 'plantvillage'.")
+        raise ValueError(
+            f"Unsupported dataset: {dataset_name}. "
+            f"Supported: 'cifar100', 'plantvillage', 'busi'."
+        )
 
     # Data-efficiency sweeps: keep only a stratified slice of the train split.
     # The val split is never subsampled -- every point on the curve is scored

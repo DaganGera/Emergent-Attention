@@ -1,0 +1,16 @@
+dataset: busi
+data_root: ./data
+busi_root: data/busi/Dataset_BUSI_with_GT
+batch_size: 64
+num_workers: 0
+pin_memory: true
+
+# Only 780 images total, so the train split is ~624. drop_last=True in the
+# loader leaves 9 batches per epoch -- the run is short, and absolute accuracy
+# will be well below the CIFAR-100 numbers. That is the point: this is the
+# low-data, high-speckle regime the architecture is being tested on.
+#
+# NOTE: pass model.num_classes=3 on the command line. The model configs default
+# to 100 for CIFAR-100 and nothing infers class count from the dataset.
+train_fraction: 1.0
+subsample_seed: 42
