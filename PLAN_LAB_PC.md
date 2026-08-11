@@ -4,6 +4,31 @@
 > PC (it trains the baselines). This file is self-contained — hand it to a fresh Claude Code instance
 > on the lab PC. You get this file by cloning the repo in Step 5.
 
+## STATUS AS OF 2026-08-07 — read this first
+
+**Steps 1–8a/8b/8c (the split-ratio ablation) are DONE.** Results, with a second seed added for
+variance (seed 123), are already written into `paper.md` §5.4:
+
+| NCA:Attn split | seed 42 | seed 123 |
+|---|---:|---:|
+| 0:12 (pure attention) | 76.33% | 77.04% |
+| 3:9 | 80.92% | 81.26% |
+| **6:6 (Hybrid)** | 81.29–81.91% | **81.59%** |
+| 9:3 | 80.69% | 81.19% |
+| 12:0 (pure NCA) | 73.99% | 73.52% |
+
+6:6 wins on both seeds — the paper's central "depth-ordering matters" claim is now fully backed,
+not pending. This has already been committed and pushed to `origin/main` (commit `f9e15a0`).
+
+**Also done since this plan was written:** PlantVillage dataset support was added to
+`src/data/plantvillage.py` + `configs/data/plantvillage.yaml` and is in `origin/main` too.
+
+**Your next task is Step 12 below (NCA depth K ablation) — the one remaining gap the paper
+explicitly flags as not yet ablated.** Steps 1–7 (environment, GPU, clone) you've already done once;
+skip straight to `git pull` (see Step 12) if this machine still has the conda env from before.
+
+---
+
 ## Context
 Fresh AI-lab PC: **RTX 5060 Ti (Blackwell / sm_120)**, Core Ultra 9, 32 GB RAM, admin rights,
 internet via Chrome Remote Desktop. Access ~11 AM–3 PM; the machine is **shut down / logged out at
@@ -111,14 +136,10 @@ python scripts/train.py model=nca_vit_hybrid model.nca_depth=9 model.attn_depth=
   hydra.job.chdir=true hydra.run.dir=outputs/exp/split_9_3 `
   | Tee-Object -FilePath outputs\split_9_3.log
 ```
-**If all three finish and time remains — NCA depth K ablation** (you already have K=4):
-```powershell
-python scripts/train.py model=nca_vit_tiny model.nca_steps=1 data=cifar100 data.data_root=C:/Emergent-Attention/data data.batch_size=64 hydra.job.chdir=true hydra.run.dir=outputs/exp/K1 | Tee-Object outputs\K1.log
-python scripts/train.py model=nca_vit_tiny model.nca_steps=2 data=cifar100 data.data_root=C:/Emergent-Attention/data data.batch_size=64 hydra.job.chdir=true hydra.run.dir=outputs/exp/K2 | Tee-Object outputs\K2.log
-python scripts/train.py model=nca_vit_tiny model.nca_steps=8 data=cifar100 data.data_root=C:/Emergent-Attention/data data.batch_size=64 hydra.job.chdir=true hydra.run.dir=outputs/exp/K8 | Tee-Object outputs\K8.log
-```
 Monitor in a 2nd tab: `nvidia-smi` and `Get-Content outputs\split_0_12.log -Wait -Tail 5`. You may
 disconnect Chrome Remote Desktop while training — the run continues until 3 PM logout.
+
+*(This step is DONE — see the STATUS banner at the top of this file. Skip to Step 12.)*
 
 ## Step 9 — Before 3 PM every day: back up (insurance against disk wipe)
 ```powershell
@@ -155,3 +176,62 @@ yesterday's Drive zip into `C:\Emergent-Attention\outputs\`, then re-run the sam
 ## Estimated time (RTX 5060 Ti)
 - Each split run, 300 ep: ~7–11 h (confirm with Step 7). Lab's ~8h realistically finishes ~1 run
   (start with 0:12); continue the rest on the home PC via the backup + resume.
+
+---
+
+## Step 12 — NCA depth K ablation (the actual next task — start here)
+
+**Why:** `paper.md` §5.4 explicitly lists this as the one remaining un-ablated design choice
+("NCA depth K — only K=4 has been run"). K=4 is the value used in every headline model; this fills
+in K∈{1,2,8} to show the paper's "iteration is essential" claim is a real curve, not an assertion.
+
+**12a — Sync first, before doing anything else:**
+```powershell
+cd C:\Emergent-Attention
+git pull origin main
+```
+This pulls the finalized split-ratio results, PlantVillage support, and the current paper — confirm
+`git log -1` shows commit `f9e15a0` or later before proceeding, so you're not working from a stale
+copy that would redo work already done.
+
+**12b — Same invariants as before**: 300 epochs, seed 42, `batch_size=64`, untouched
+`configs/training/default.yaml`. Model is `nca_vit_tiny` (pure NCA-ViT, 12 blocks) — the only
+override is `model.nca_steps`.
+
+```powershell
+$env:WANDB_MODE="disabled"; cd C:\Emergent-Attention
+python scripts/train.py model=nca_vit_tiny model.nca_steps=1 data=cifar100 `
+  data.data_root=C:/Emergent-Attention/data data.batch_size=64 `
+  hydra.job.chdir=true hydra.run.dir=outputs/exp/K1 | Tee-Object outputs\K1.log
+
+python scripts/train.py model=nca_vit_tiny model.nca_steps=2 data=cifar100 `
+  data.data_root=C:/Emergent-Attention/data data.batch_size=64 `
+  hydra.job.chdir=true hydra.run.dir=outputs/exp/K2 | Tee-Object outputs\K2.log
+
+python scripts/train.py model=nca_vit_tiny model.nca_steps=8 data=cifar100 `
+  data.data_root=C:/Emergent-Attention/data data.batch_size=64 `
+  hydra.job.chdir=true hydra.run.dir=outputs/exp/K8 | Tee-Object outputs\K8.log
+```
+Run one at a time, same resume/backup/kill-safety rules as Step 8–11 above (re-run the same
+command to resume after a 3 PM shutdown; back up `outputs/exp/` to Drive before logout each day).
+
+**12c — When all three finish, collect the numbers:**
+```powershell
+python -c "import torch,glob; [print(p, round(torch.load(p,map_location='cpu',weights_only=False)['best_acc'],2)) for p in glob.glob('outputs/exp/K*/checkpoints/**/latest.pt',recursive=True)]"
+```
+You'll have K∈{1,2,4,8} (K=4 is the existing 73.99% headline pure-NCA number) — a full depth curve.
+
+**12d — Report back by pushing to git, not just a Drive zip** (this repo already has working push
+access — commit `f9e15a0` proves it):
+```powershell
+git add outputs/K1.log outputs/K2.log outputs/K8.log
+git commit -m "Add NCA depth K ablation (K=1,2,8) to complete the depth-iteration curve"
+git push origin main
+```
+Don't commit `outputs/exp/**/checkpoints/` (large binaries, not needed — the log + printed
+`best_acc` numbers above are what go in the paper). If you want the checkpoints preserved too, zip
+`outputs/exp/K*` and upload to the same Drive folder as before, same as Step 9.
+
+**12e — Tell the home PC.** Once pushed, say so — the K-depth table needs to be added to `paper.md`
+§5.4 (replacing "NCA depth K — only K=4 has been run" with the real K∈{1,2,4,8} curve), which should
+happen on whichever machine is talking to you next.
