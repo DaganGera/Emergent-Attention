@@ -123,8 +123,11 @@ def main():
     fig = plot_receptive_field_growth(snapshots)
     path = os.path.join(args.output_dir, f"receptive_field_block{args.block_idx}.pdf")
     fig.savefig(path)
+    png_path = os.path.join(args.output_dir, f"receptive_field_block{args.block_idx}.png")
+    fig.savefig(png_path, dpi=300)
     plt.close(fig)
     print(f"Saved: {path}")
+    print(f"Saved: {png_path}")
 
     # 2. Emergence animation (optional)
     if args.animate:

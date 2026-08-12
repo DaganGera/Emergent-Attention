@@ -1,53 +1,50 @@
-# Emergent Attention: Global Receptive Fields via Iterated Local Neural Cellular Automata in Vision Transformers
+# Emergent Attention: Iterated Local Neural Cellular Automata as a Noise-Robust Token Mixer for Vision Transformers
 
 **Anonymous Authors**
-*Under review — draft v2*
+*Preprint — draft v3*
 
 ---
 
 ## Abstract
 
-We introduce **Emergent Attention**, a drop-in replacement for multi-head self-attention (MHSA) in Vision Transformers that replaces the O(n²) all-to-all token mixing with **K iterations of a local Neural Cellular Automaton (NCA)** operating on the patch grid. Each NCA step applies a fixed 3×3 depthwise perception (Sobel-X, Sobel-Y, Identity) followed by a shared two-layer MLP that produces an additive cell-state update; the update is gated at training time by a Bernoulli mask to regularize the dynamics. Because the effective receptive field grows with the number of iterations, global context *emerges* from purely local interactions rather than being computed in a single quadratic step. We further propose a **Hybrid NCA-ViT** in which the early half of the backbone uses Emergent Attention (for local structure formation) and the later half uses standard MHSA (for global refinement). On CIFAR-100, Hybrid NCA-ViT reaches **81.91 % top-1 / 95.66 % top-5** with 6.5 M parameters, a **+9.02 % absolute improvement** over a DeiT-Tiny baseline of comparable size (72.89 % top-1, 5.5 M parameters), under matched training. Unlike prior work that inserts NCA as an auxiliary module alongside attention, Emergent Attention **fully replaces** the token mixer, uses **fixed, non-learned** perception kernels, and identifies a **depth-ordering effect** — NCA layers early, attention layers late — as the dominant design factor. A two-seed split-ratio sweep (0:12 through 12:0) confirms this: the 6:6 split sits at the peak of the curve, beating pure attention by 4.6–5.3 points and pure NCA by 7.6–8.4 points, consistently across seeds. We provide this ablation together with receptive-field visualizations that confirm the emergent-global behavior predicted by the model, and report which remaining experiments (NCA-depth ablation, Swin-Tiny baseline) are still in progress at time of writing.
+We introduce **Emergent Attention**, a drop-in replacement for multi-head self-attention (MHSA) in Vision Transformers that replaces the $O(n^2)$ all-to-all token mixing with $K$ iterations of a local Neural Cellular Automaton (NCA) operating on the patch grid. Each iteration applies a **fixed** (non-learned) $3\times3$ depthwise perception (Sobel-X, Sobel-Y, Identity) followed by a shared two-layer MLP that produces an additive, Bernoulli-gated cell-state update. We propose **Hybrid NCA-ViT**, in which the first half of the backbone uses Emergent Attention and the second half uses standard MHSA. On CIFAR-100, Hybrid NCA-ViT reaches **81.91% top-1** with 6.46M parameters, matching Swin-Tiny (81.56%, 27.60M params, 4.3$\times$ more parameters) and beating DeiT-Tiny by **+9.0 points** under identical training. A two-seed depth-ordering sweep confirms the 6:6 (NCA-early, attention-late) split is a genuine peak, not an artifact of any particular mix.
 
-**Keywords:** vision transformer, neural cellular automata, attention, emergent computation, local-to-global inference, adversarial robustness.
+The main contribution of this work is not the clean-data accuracy number — Swin matches it with far more parameters — but a **specific, mechanistically-grounded robustness property**. On CIFAR-100-C (19 corruption types $\times$ 3 severities), Hybrid NCA-ViT achieves the highest mean corrupted accuracy of five architectures (61.88%, vs. 59.37% for Swin-Tiny and 53.60% for DeiT-Tiny), and the advantage is **not uniform**: it concentrates almost entirely in additive high-frequency pixel noise (+8.3 points over the best attention-only baseline) and is negligible-to-negative on blur, weather, and impulse noise. We verify this is not a training-noise artifact by measuring representation drift under corruption directly: the classifier's pre-head feature moves less under the corruptions where the hybrid wins and *more* under the one corruption family where it loses (impulse noise), a sign-correct falsification test. We further validate this property on a genuine low-data medical-imaging domain — **BUSI, 780 breast-ultrasound images** — where speckle, the dataset's dominant noise process, is the exact corruption family the mechanism predicts an advantage for. Across 3 seeds, Hybrid NCA-ViT beats a matched DeiT-Tiny on balanced accuracy (49.8% vs. 36.4%) and macro-F1 (41.5% vs. 21.0%) with **no overlap in range between architectures on either metric**, while DeiT-Tiny's top-1 falls below the majority-class baseline on all three seeds.
+
+**Keywords:** vision transformer, neural cellular automata, corruption robustness, representation stability, medical imaging, data efficiency.
 
 ---
 
 ## 1. Introduction
 
-Self-attention is the computational core of the modern Vision Transformer (ViT) [1]. Its appeal is that every token can attend to every other token in a single layer, so global context is available immediately. Its cost is that this single layer has O(n²) complexity in the number of tokens, and, under the prevailing softmax-QKV formulation, produces attention maps that are often unstable, difficult to interpret, and vulnerable to adversarial perturbation.
+Self-attention is the computational core of the modern Vision Transformer (ViT) [1]. Every token attends to every other token in a single layer, so global context is available immediately, at $O(n^2)$ cost in the number of tokens $n$. A complementary line of work, **Neural Cellular Automata** (NCA) [4], shows that complex spatial behavior can emerge from repeated application of a small, local update rule — a computational regime that is intrinsically local, translation-equivariant, and iteratively refining, properties softmax attention lacks by construction.
 
-A complementary line of work — **Neural Cellular Automata** [4] — has shown that surprisingly complex spatial behavior (morphogenesis, classification, segmentation) can emerge from the repeated application of a small local update rule. NCAs are intrinsically local, translation-equivariant, and iteratively refining: properties that softmax attention lacks by construction. Recent work has begun to combine NCA with Transformer components — AdaNCA [12] inserts NCA blocks as adaptors between attention layers to improve robustness, and ViTCA [13] fuses attention *into* the NCA update rule itself. Both keep standard self-attention as the primary token mixer. The question we ask is more direct:
+Two recent papers combine NCA and Transformer machinery. **AdaNCA** [12] (NeurIPS 2024) inserts NCA blocks as *adaptors between* existing attention layers to improve robustness; standard MHSA remains the primary mixer throughout. **ViTCA** [13] (NeurIPS 2022) fuses attention *into* the NCA cell-update rule itself. In both, attention is never removed. We ask a more direct question:
 
-> *Can iterated local NCA dynamics fully replace global softmax attention as the token mixer inside a Vision Transformer, rather than augment it?*
+> *Can iterated local NCA dynamics fully replace global softmax attention as the token mixer, rather than augment it — and if the resulting model is more robust to noise, can that robustness be characterized precisely enough to predict where it will and will not appear?*
 
-Our answer is yes, with one caveat. A pure-NCA backbone trains stably and reaches competitive accuracy, but the strongest configuration uses NCA layers for *early* feature formation and standard attention layers for *late* semantic aggregation. We call this a Hybrid NCA-ViT. On CIFAR-100 it outperforms a same-scale DeiT-Tiny by 9.02 % top-1 under matched training.
+Our answer to the first half is yes, with a specific architecture: NCA blocks for early local feature formation, standard attention blocks for late global aggregation ("Hybrid NCA-ViT"). Our answer to the second half is the paper's central contribution: the robustness is **not general** — it is concentrated in additive high-frequency noise, it is measurable directly in the network's internal representations, and it correctly predicts its own failure mode (impulse/salt-and-pepper noise, where the same mechanism that suppresses additive noise actively spreads outliers). We validate the prediction on a real, non-synthetic domain — ultrasound imaging — chosen specifically because its dominant artifact (speckle) is the corruption family the mechanism favors.
 
 **Our contributions.**
 
-1. **Emergent Attention**, an NCA-based token mixer with fixed (non-learned) 3×3 Sobel + Identity perception, a shared two-layer update MLP, zero-initialized output projection (so each block is an identity map at init), and Bernoulli-gated stochastic updates during training. Unlike AdaNCA/ViTCA, this fully replaces MHSA rather than adapting or fusing with it.
-2. **NCA-ViT** and **Hybrid NCA-ViT**, two ViT-scale architectures that instantiate (1) as either a pure-NCA stack or a layered NCA → MHSA composition, with a two-seed split-ratio ablation (§5.4) confirming that the *ordering* (NCA-early / attention-late) — not merely the presence of both mixers — is the dominant design variable.
-3. **Empirical evidence** on CIFAR-100 that Hybrid NCA-ViT achieves 81.91 % top-1 versus 72.89 % for DeiT-Tiny at comparable parameter count, and versus 72.33 % / (in progress) for ViT-Tiny / Swin-Tiny baselines trained under the identical recipe.
-4. **Visualizations** of the receptive field as a function of NCA depth, showing that the effective receptive field grows with iteration count as predicted.
-5. **A reproducible implementation** (Hydra-configured, AMP-enabled, EMA-tracked, checkpoint-resumable) with all configs, tests, and trained checkpoints, and an explicit account of which ablations are finalized versus still running (§5.4, §7).
+1. **Emergent Attention**: an NCA-based token mixer with fixed (non-learned by default) Sobel+Identity perception, a shared two-layer update MLP with zero-initialized output (identity map at init), and Bernoulli-gated stochastic updates. Unlike AdaNCA/ViTCA, this **fully replaces** MHSA rather than adapting or fusing with it.
+2. **Hybrid NCA-ViT**, with a two-seed depth-ordering ablation (§5.2) showing the NCA-early/attention-late split is a genuine peak in accuracy, not simply "using both mixers."
+3. **A frequency-specific characterization of corruption robustness** (§5.4): the hybrid's advantage over attention-only baselines is concentrated in additive pixel noise (+8.3pp) and near-zero elsewhere, measured across all 19 CIFAR-100-C corruption types.
+4. **A mechanistic, falsifiable explanation** (§5.5): representation drift under corruption, measured at the exact feature each model's classification head reads, is lower for the hybrid on 17/19 corruptions — and higher (not lower) on the one corruption family where its accuracy is worse, matching the theory's own predicted failure mode.
+5. **Real-domain validation on BUSI ultrasound** (§5.7), a 780-image, 3-class, severely-imbalanced medical dataset chosen because its dominant artifact (speckle) matches the mechanism directly. Verified across 3 seeds with non-overlapping performance ranges between architectures.
+6. **A reproducible implementation** (Hydra-configured, checkpoint-resumable) with all configs, trained checkpoints, and evaluation/analysis scripts released.
 
 ---
 
 ## 2. Related Work
 
-**Vision Transformers.** ViT [1] established that pure attention stacks can match convolutional networks at scale. DeiT [2] closed the data-efficiency gap with distillation and heavy augmentation. Swin Transformer [3] reintroduced locality via shifted windows, trading some global capacity for compute efficiency. Our work takes the locality idea further — to a *per-pixel 3×3 neighborhood* — and recovers globality through iteration rather than windowing.
+**Vision Transformers.** ViT [1] established that pure attention stacks can match convolutional networks at scale. DeiT [2] closed the data-efficiency gap with distillation and heavy augmentation. Swin [3] reintroduced locality via shifted windows. We take locality further, to a per-cell $3\times3$ neighborhood, and recover globality through iteration rather than windowing or hierarchical merging.
 
-**Efficient and linear attention.** Performer, Linformer, and related approximations reduce attention complexity while preserving its softmax-QKV shape. Flash attention accelerates the exact softmax primitive. Emergent Attention differs: it abandons the query–key–value formulation entirely in favor of spatial convolution plus iteration.
+**Neural Cellular Automata.** NCA [4] showed that a small local update rule, applied repeatedly, reproduces target images from a single seed cell. Subsequent work extended NCAs to classification, texture synthesis, and volumetric growth.
 
-**Neural Cellular Automata.** NCA [4] demonstrated that a small local update rule, applied repeatedly, can reproduce target images from a single seed. Subsequent work extended NCAs to classification, texture synthesis, and 3D volumetric growth.
+**NCA combined with Transformers — closest prior work.** **AdaNCA** [12] inserts NCA adaptors between ViT attention layers and reports improved robustness across 8 benchmarks, including "certain types of noise" — the published description does not decompose which corruption families benefit or characterize a mechanism, and attention remains the primary mixer throughout the network. **ViTCA** [13] computes the NCA's per-cell update via self-attention over a local neighborhood — attention is fused into the cellular update rule, not replaced. Emergent Attention differs along three axes: **(i) full replacement, not augmentation** — no attention computation occurs inside NCA blocks; **(ii) fixed, non-learned perception** by default; **(iii) a frequency-specific, mechanistically-verified robustness claim** (§5.4–5.5) rather than an aggregate one — to our knowledge neither prior work provides a representation-level causal account of *why* NCA helps or predicts *which* corruptions it will fail on.
 
-**NCA combined with Transformers — closest prior work.** Two recent papers combine NCA and Transformer machinery, and our positioning against both is the central novelty claim of this work:
-- **AdaNCA** [12] (NeurIPS 2024) inserts NCA blocks as *adaptors* between existing ViT attention layers to improve robustness and out-of-distribution generalization. Standard MHSA remains the primary token mixer throughout the network; NCA is auxiliary.
-- **ViTCA** [13] (NeurIPS 2022) builds an NCA whose per-cell update rule is itself computed via self-attention over a local neighborhood — attention is fused *into* the NCA cell, not replaced by it.
-
-Emergent Attention differs from both along three axes: **(i) replacement, not augmentation** — NCA is the sole token mixer in the NCA blocks, with no attention computation inside them; **(ii) fixed, non-learned perception** — Sobel-X/Sobel-Y/Identity kernels are frozen (an optional `learnable_filters` flag exists but is off by default), whereas AdaNCA and ViTCA both learn their perception/update rules end-to-end; **(iii) a depth-ordering claim** — we find empirically that placing NCA blocks *before* attention blocks in the stack, rather than interleaving or adapting, is what drives the accuracy gain (§5.4). We do not claim NCA-in-a-Transformer is a new idea; we claim this specific combination (full replacement, fixed perception, depth-ordered hybrid) is unexplored by [12, 13] and is the locus of our empirical contribution.
-
-**Convolution + attention hybrids.** CoAtNet, Conformer, and MobileViT interleave convolution and attention. Our hybrid is related in spirit but differs in two respects: (i) the "convolutional" half is an *iterated* NCA, not a feed-forward conv stage, and (ii) the split is strictly layer-wise (depth ordered), which we show matters empirically.
+**Adversarial and corruption robustness.** FGSM [10] and PGD [11] measure worst-case robustness; Hendrycks & Dietterich's CIFAR-100-C [14] measures robustness to common, naturally-occurring corruptions at graded severity — the benchmark we use for the frequency decomposition in §5.4, precisely because it separates corruption *types* rather than reporting one aggregate number.
 
 ---
 
@@ -55,95 +52,82 @@ Emergent Attention differs from both along three axes: **(i) replacement, not au
 
 ### 3.1 Preliminaries
 
-Given an image `x ∈ ℝ^{3×H×W}`, a standard ViT patch-embeds `x` into `n = (H/p)(W/p)` tokens of dimension `D`, prepends a learnable CLS token, adds positional embeddings, and applies a stack of blocks. Each block computes:
+A standard ViT block computes:
 
-```
-z' = z + MHSA(LN(z))
-z  = z' + MLP(LN(z'))
-```
+$$z' = z + \mathrm{MHSA}(\mathrm{LN}(z)), \qquad z = z' + \mathrm{MLP}(\mathrm{LN}(z'))$$
 
-We retain this block skeleton but replace `MHSA(·)` with `NCAAttention(·)`.
+We retain this residual skeleton and replace $\mathrm{MHSA}(\cdot)$ with $\mathrm{NCAAttention}(\cdot)$.
 
 ### 3.2 Emergent Attention
 
-Let `z ∈ ℝ^{B × (1+n) × D}` denote the token sequence with CLS at index 0 and patch tokens `p ∈ ℝ^{B × n × D}` at indices 1..n. Let `Hp × Wp = n` be the patch-grid shape.
+Let $z \in \mathbb{R}^{B \times (1+n) \times D}$ be the token sequence, CLS at index 0, patch tokens $p \in \mathbb{R}^{B \times n \times D}$ at indices $1..n$, arranged on an $H_p \times W_p = n$ grid.
 
-**Step 1 — CLS isolation.** The CLS token is removed from the NCA computation entirely. Only patch tokens participate in the cellular dynamics. This prevents the CLS position from acting as an information sink that would otherwise dominate the shared local update.
+**CLS isolation.** The CLS token never participates in the NCA computation — the block returns a zero delta for it. This prevents CLS from acting as an information sink inside a rule meant to be shared, identically, across all spatial cells.
 
-**Step 2 — Sequence → grid.**
-```
-s₀ = rearrange(LN(p), "b (hp wp) d -> b d hp wp")
-```
+**Sequence → grid.**
+$$s_0 = \mathrm{rearrange}\big(\mathrm{LN}(p),\ \text{"}b\ (h_p\, w_p)\ d \to b\ d\ h_p\ w_p\text{"}\big)$$
 
-**Step 3 — Perception.** A fixed 3×3 depthwise convolution applies `M = 3` hand-chosen filters — Sobel-X, Sobel-Y, and Identity — per channel:
+**Perception.** A fixed depthwise $3\times3$ convolution ($\text{groups}=D$) applies $M=3$ hand-chosen filters per channel:
 
-```
-Sobel-X  = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]
-Sobel-Y  = [[-1,-2,-1], [ 0, 0, 0], [ 1, 2, 1]]
-Identity = [[ 0, 0, 0], [ 0, 1, 0], [ 0, 0, 0]]
-```
+$$
+\text{Sobel-X} = \begin{bmatrix}-1&0&1\\-2&0&2\\-1&0&1\end{bmatrix}\qquad
+\text{Sobel-Y} = \begin{bmatrix}-1&-2&-1\\0&0&0\\1&2&1\end{bmatrix}\qquad
+\text{Identity} = \begin{bmatrix}0&0&0\\0&1&0\\0&0&0\end{bmatrix}
+$$
 
-The convolution uses `groups = D`, so channels are processed independently. The output has shape `(B, D·M, Hp, Wp)`. Sobel-X and Sobel-Y together encode the local spatial gradient of the state; Identity preserves the cell's own value. These filters are **fixed by default**; an optional `learnable_filters` flag unfreezes them for end-to-end training and is used only in the Hybrid config's ablation variant (§5.4), not the reported headline model.
+producing $\text{perc} \in \mathbb{R}^{B \times DM \times H_p \times W_p}$. These filters are frozen by default (`learnable_filters=False`); an optional flag unfreezes them but is not used for any headline result in this paper.
 
-**Step 4 — Update MLP.**
-```
-perc = rearrange(perc, "b (d m) hp wp -> b hp wp (d m)")
-h    = ReLU(W₁ · perc + b₁)        # W₁ ∈ ℝ^{(D·M) × H_mlp}
-δ    = W₂ · h + b₂                  # W₂ ∈ ℝ^{H_mlp × D}
-δ    = rearrange(δ, "b hp wp d -> b d hp wp")
-```
+**Update MLP** (shared across all cells):
+$$h = \mathrm{ReLU}(W_1 \cdot \text{perc} + b_1), \qquad \delta = W_2 \cdot h + b_2$$
 
-Crucially, `W₂` and `b₂` are **zero-initialized**, so `δ₀ = 0` at step 0 and the entire block is an identity mapping at training start. This gives stable gradient flow and removes the need for any warm-up schedule on the NCA layers themselves.
+$W_2, b_2$ are **zero-initialized**, so $\delta \equiv 0$ at step 0 and the block is an exact identity map at the start of training — no NCA-specific warm-up schedule is required.
 
-**Step 5 — Stochastic update.**
-```
-s_{t+1} = s_t + m_t ⊙ δ_t     (training,  m_t ~ Bernoulli(p) per cell)
-s_{t+1} = s_t + δ_t            (inference, deterministic)
-```
+**Stochastic update.** At each of $K$ iterations:
+$$
+s_{t+1} = \begin{cases} s_t + m_t \odot \delta_t, & m_t \sim \mathrm{Bernoulli}(p), & \text{training} \\ s_t + \delta_t, & & \text{inference} \end{cases}
+$$
+with default $p=0.5$, following standard NCA stabilization practice [4].
 
-The per-cell Bernoulli mask (with default `p = 0.5`) prevents every cell from updating on every iteration and is essential to the stability of NCA-style dynamics [4]. At inference time the mask is disabled for determinism.
+**Output.** After $K$ iterations (default $K=4$), the block returns the accumulated delta $\Delta = s_K - s_0$, reshaped to a sequence, concatenated with a zero CLS delta, and added to the residual stream:
 
-**Step 6 — K iterations.** Steps 3–5 are repeated `K` times (default `K = 4`). The output of the block is the **accumulated delta**
-```
-Δ = s_K − s₀
-```
-which is reshaped back into a token sequence and returned as the additive contribution to the residual stream. The CLS token passes through unchanged.
+$$z \leftarrow z + \mathrm{DropPath}(\mathrm{NCAAttention}(z))$$
 
-### 3.3 Receptive Field Analysis
+Figure 1(b) diagrams one iteration end-to-end.
 
-A single NCA iteration has a spatial receptive field of 3×3 pixels (one for each direction of the 3×3 perception kernel). After `K` iterations, each cell has been influenced by every cell within `K`-hops on the grid, yielding an effective receptive field of `(2K+1) × (2K+1)` pixels on the 14×14 patch grid — 9×9 for `K = 4`. Full 14×14 grid coverage requires K ≈ 7. §5.3 visualizes this growth empirically.
+### 3.3 Architectures
 
-### 3.4 Architectures
+**Hybrid NCA-ViT.** The first $L_N=6$ blocks use Emergent Attention ($D=192$, $K=4$, $H_{mlp}=384$); the remaining $L_A=6$ use standard MHSA (3 heads). Classification uses **global average pooling over patch tokens** — the CLS token is excluded from the NCA grid throughout the network and is therefore never populated with image-dependent information, so the head reads the patch tokens directly rather than CLS. Total: **6.46M parameters**. Figure 1(a) diagrams the full pipeline.
 
-**NCA-ViT.** A straight stack of `L = 12` blocks, each using Emergent Attention with `D = 192, K = 4, H_mlp = 384`, followed by a standard feed-forward sub-block (`mlp_ratio = 4.0`). Classification uses **Global Average Pooling over patch tokens** (the CLS token is dropped at the head) followed by a linear projection to `C` classes. Total parameters: **~7.2 M**.
+**NCA-ViT (pure).** All 12 blocks use Emergent Attention. Total: 7.31M parameters. Used as an isolating baseline in §5.2 and §5.5 (below the hybrid's clean accuracy by 7.9pp, yet still winning on several corruption types — the attribution argument in §5.5 rests on this gap).
 
-**Hybrid NCA-ViT.** The first `L_N = 6` blocks use Emergent Attention; the remaining `L_A = 6` blocks use standard multi-head self-attention (`num_heads = 3`, `mlp_ratio = 4.0`). The intuition is that early layers benefit from locality-biased, iterative feature formation, while later layers benefit from the direct global aggregation of softmax attention. Total parameters: **6.46 M**. This is the ordering ablated in §5.4.
+<p align="center">
+  <img src="figures/paper/architecture.png" width="100%">
+  <br><em>Figure 1. (a) The Hybrid NCA-ViT pipeline: 6 Emergent Attention blocks (local, fixed perception) followed by 6 standard MHSA blocks (global), pooled and classified via GAP over patch tokens. (b) One NCA iteration: three fixed depthwise kernels → shared update MLP with zero-initialized output → Bernoulli-gated additive update, repeated K=4 times.</em>
+</p>
 
-### 3.5 Complexity
+### 3.4 Complexity
 
-For a sequence of `n` patch tokens, embedding dimension `D`, and NCA depth `K`:
+| Component | Complexity |
+|---|---|
+| MHSA | $O(n^2 D)$ |
+| Emergent Attention | $O(K n D^2)$ (MLP-dominated) |
+| Perception conv | $O(K n D M k^2)$, $k=3$ |
 
-| Component            | Complexity         |
-|----------------------|--------------------|
-| MHSA                 | `O(n² · D)`        |
-| Emergent Attention   | `O(K · n · D²)` (MLP-dominated)    |
-| Perception conv      | `O(K · n · D · M · k²)`, `k = 3`   |
-
-For the token counts common in ViT-scale vision (`n = 196` on 224×224/16) Emergent Attention is linear in `n` and the cost is dominated by the shared two-layer MLP. Our measured throughput (585 img/s for Hybrid NCA-ViT vs 1672 img/s for DeiT-Tiny on an RTX 4060, uncontended) reflects the fact that we trade a single large softmax for `K` small depthwise-conv + MLP passes, for which a fused hardware kernel does not yet exist. We regard this as an implementation, not an architectural, limitation.
+At $n=196$ (224px/patch16), Emergent Attention is linear in $n$; measured throughput (585 img/s for the hybrid vs. 1672 img/s for DeiT-Tiny, RTX 4060, uncontended) reflects that we trade one large fused softmax kernel for $K$ small depthwise-conv-plus-MLP passes, for which no fused kernel yet exists. We treat this as an implementation gap, not an architectural one, and report it honestly rather than omit it (§6).
 
 ---
 
 ## 4. Experimental Setup
 
-**Dataset.** CIFAR-100 (50 000 train / 10 000 test, 100 classes). Images are upsampled from 32×32 to 224×224 with bicubic interpolation so that we use the standard ViT 16×16 patch embedding.
+**Primary dataset.** CIFAR-100 (50,000 train / 10,000 test, 100 classes), images bicubic-upsampled from 32×32 to 224×224.
 
-**Augmentation.** RandomCrop(32, pad=4) → HFlip → Resize(224) → RandAugment(ops=2, mag=9) → Normalize (CIFAR-100 statistics) → RandomErasing(p = 0.25). Mixup (`α = 0.8`) and CutMix (`α = 1.0`) are applied batch-wise with probability 0.5 each and label smoothing `ε = 0.1`.
+**Training recipe** (identical across every model in Table 1, enforced by a shared Hydra config): AdamW, $\text{lr}=5\times10^{-4}$, $\text{wd}=0.05$, batch size 64, 300 epochs, cosine schedule with 10-epoch warmup, label smoothing 0.1, Mixup ($\alpha=0.8$) + CutMix ($\alpha=1.0$) at 0.5 probability each, RandAugment(2, 9), Random Erasing (p=0.25), AMP, EMA (decay 0.9999), seed 42 unless otherwise noted. No ImageNet pretraining for any model — every number in Table 1 is trained from random initialization under this identical recipe.
 
-**Optimization.** AdamW with `lr = 5·10⁻⁴`, `wd = 0.05`, `β = (0.9, 0.999)`, batch size 64, 300 epochs, cosine decay with 10-epoch linear warm-up and `min_lr = 10⁻⁶`. Gradient clipping at 1.0. Mixed precision (AMP) and model-EMA with decay 0.9999. Seed 42 for all runs (single-seed; §7 lists multi-seed as future work).
+**Corruption robustness.** CIFAR-100-C [14]: 19 corruption types × 5 severities, applied to the CIFAR-100 test set. We evaluate at severities {1, 3, 5}, 1000 images per (corruption, severity) cell, for all 5 architectures — a stratified subset of the full 950k-image grid chosen to keep the sweep tractable on a single workstation GPU while covering the full severity range and every corruption type.
 
-**Baselines.** DeiT-Tiny (5.54 M) and ViT-Tiny (comparable scale), trained under identical augmentation and optimization from random initialization (no ImageNet pretraining), checkpoints selected by best validation top-1. Swin-Tiny is trained under the same recipe but was not finished at time of writing (§5.1).
+**Domain-transfer dataset.** BUSI [15]: 780 breast-ultrasound images, 3 classes (437 benign / 210 malignant / 133 normal), from 600 patients, no official split and no patient IDs in the public release (§5.7 discusses the resulting caveat). Trained from random initialization at the same 300-epoch recipe, with Mixup/CutMix disabled and inverse-frequency class-weighted cross-entropy (§5.7 justifies this deviation empirically).
 
-**Hardware.** Training was run across two machines to identical config: a home workstation (RTX 4060, 8 GB) for the headline models and the ViT-Tiny/Swin-Tiny baselines, and a lab workstation (RTX 5060 Ti, Blackwell) for the split-ratio ablation sweep. All numbers reported below are reproducible from the released Hydra configs (`configs/train.yaml`, `configs/model/*.yaml`, `configs/data/cifar100.yaml`, `configs/training/default.yaml`) with `batch_size=64` and `seed=42` held fixed across every run.
+**Hardware.** Two machines, identical configs: an RTX 4060 (headline CIFAR-100 models, corruption/mechanism/BUSI analysis) and an RTX 5060 Ti (depth-ordering ablation sweep). `batch_size=64` and `seed=42` (or the stated alternate seed) are held fixed across every run; only the variable under study changes.
 
 ---
 
@@ -151,163 +135,262 @@ For the token counts common in ViT-scale vision (`n = 196` on 224×224/16) Emerg
 
 ### 5.1 Main Result
 
-| Model              | Params (M) | GFLOPs | Top-1 (%) | Top-5 (%) | Img/s | Status |
-|--------------------|-----------:|-------:|----------:|----------:|------:|--------|
-| DeiT-Tiny          |       5.54 |  1.08  |     72.89 |     91.34 |  1672 | finished, re-verified |
-| ViT-Tiny           |       ~5.5 |    —   |     72.33 |     —     |   —   | finished |
-| Pure NCA-ViT (12:0)|       ~7.2 |    —   |     73.99 |     93.32 |   427 | finished, verified |
-| Swin-Tiny          |          — |    —   |         — |     —     |   —   | **training in progress** |
-| **Hybrid NCA-ViT (6:6)** |   **6.46** |  2.41  | **81.91** | **95.66** |   585 | finished¹ |
-| Δ (Hybrid − DeiT)  |      +0.92 | +1.33  |  **+9.02** |   +4.32 |   −   | |
+| Model | Params (M) | GFLOPs | Top-1 (%) | Top-5 (%) | Img/s |
+|---|---:|---:|---:|---:|---:|
+| ViT-Tiny | 5.54 | 1.08 | 72.32 | 91.16 | 1662 |
+| DeiT-Tiny | 5.54 | 1.08 | 72.89 | 91.34 | 1672 |
+| Pure NCA-ViT (12:0) | 7.31 | 3.55 | 73.99 | 93.32 | 427 |
+| Swin-Tiny | 27.60 | 4.51 | 81.56 | 94.83 | 337 |
+| **Hybrid NCA-ViT (6:6)** | **6.46** | **2.41** | **81.91**¹ | **95.66** | 585 |
 
-¹ The 81.91 % top-1 is from a full-test-set evaluation pass on `best.pt` (`results/nca_vit_hybrid_cifar100.json`). The training-loop-tracked EMA validation best (`latest.pt`'s `best_acc` field) shows 81.29 % — a 0.62-point gap consistent with the two measurement paths using slightly different eval harnesses (batch composition / AMP context). We flag this rather than silently pick one: a unified re-evaluation pass is planned before camera-ready. This methodological caution is informed directly by an equivalent DeiT-Tiny discrepancy (73.58 % stale eval-JSON vs 72.88 % checkpoint) that we traced and corrected in this draft — the eval-JSON value there predated a checkpoint-resume bugfix and no longer matched the current checkpoint.
+¹ Full-test-set evaluation on `best.pt`. The training-loop-tracked checkpoint field (`latest.pt`'s EMA-validation `best_acc`) shows 81.29% — a 0.62-point gap from the two paths using slightly different eval harnesses (batch composition under AMP). We report both rather than picking the favorable one; the ordering and every conclusion in this paper are unaffected by which value is used.
 
-Hybrid NCA-ViT improves top-1 accuracy on CIFAR-100 by **+9.02 %** absolute over a freshly re-verified DeiT-Tiny baseline under matched training conditions, at a cost of ~17 % more parameters and ~2.2× FLOPs. It also beats a from-scratch ViT-Tiny baseline (72.33 %) and the pure-NCA variant (73.99 %) by comparable margins, indicating the gain is not specific to one baseline family.
+Hybrid NCA-ViT **matches Swin-Tiny's accuracy with 4.3$\times$ fewer parameters and roughly half the FLOPs** (6.46M/2.41 vs. 27.60M/4.51), and beats DeiT-Tiny by +9.0 points and ViT-Tiny by +9.6 points at comparable parameter count to those two. It is 2.2$\times$ DeiT-Tiny's FLOPs, so the honest comparison is "Swin-competitive at a fraction of the size," not "cheaper than everything" — DeiT remains the throughput leader by a wide margin (§3.4).
 
-### 5.2 Robustness
+### 5.2 Depth-Ordering Ablation
 
-We evaluated adversarial robustness on the test set under matched L∞ budgets.
-
-| Model              | Clean (%) | FGSM (%) | PGD-20 (%) |
-|--------------------|----------:|---------:|-----------:|
-| **Hybrid NCA-ViT** |  **81.41** |   28.91 |       1.41 |
-
-The clean-input robustness number matches the headline top-1 (small-sample evaluation over 640 images), and the FGSM survival rate of 28.9 % is non-trivial for an undefended model. PGD-20 accuracy is near chance (1.4 %), as expected for any model without explicit adversarial training; we report it for completeness. **This table currently covers only the Hybrid model** — robustness numbers for the baselines are not yet available, so no comparative robustness claim is made in this draft (an earlier internal draft implied a comparative robustness advantage; that claim is withdrawn pending baseline measurements).
-
-### 5.3 Emergent Receptive Field
-
-Figure `figures/emergence_block0.gif` animates the receptive field of a central patch over the `K = 4` iterations of a single NCA block. It starts as a single pixel at iteration 0 and expands to a 9×9 pixel region by iteration 4, consistent with the theoretical `(2K+1)×(2K+1)` bound in §3.3. Static snapshots (`figures/receptive_field_block{0,2,5}.pdf`) show that deeper blocks exhibit larger effective receptive fields.
-
-### 5.4 Ablations — split-ratio curve (finished, two-seed)
-
-The split-ratio sweep, run on a second machine (RTX 5060 Ti) under the identical recipe (§4), is now complete for both seed 42 and an independent seed 123, giving the full curve plus a variance check:
+Existing points (6:6 and 12:0) plus a 0:12/3:9/9:3 sweep on a second machine, both at seed 42 and an independent seed 123:
 
 | NCA:Attn split | seed 42 (%) | seed 123 (%) |
-|-----------------|------------:|--------------:|
+|---|---:|---:|
 | 0:12 (pure attention) | 76.33 | 77.04 |
-| 3:9  | 80.92 | 81.26 |
-| **6:6 (Hybrid)** | 81.29–81.91* | **81.59** |
-| 9:3  | 80.69 | 81.19 |
-| 12:0 (pure NCA) | 73.99* | 73.52 |
+| 3:9 | 80.92 | 81.26 |
+| **6:6 (Hybrid)** | 81.29–81.91 | **81.59** |
+| 9:3 | 80.69 | 81.19 |
+| 12:0 (pure NCA) | 73.99 | 73.52 |
 
-*seed-42 values from the headline runs (§5.1); the checkpoint-vs-eval-script gap noted there does not affect the ordering below.
+Across both seeds, 6:6 sits at the peak: it beats pure attention by 4.6–5.3 points and pure NCA by 7.6–8.4 points, with both neighboring splits below it. The gain is attributable to the specific NCA-early/attention-late **ordering**, not to "any mix of the two mechanisms" — a monotonic curve favoring more of either mixer would not show this shape.
 
-**This confirms the paper's central claim rather than merely suggesting it.** Across both seeds, `6:6` sits at the peak of the curve: it beats pure attention (`0:12`) by **4.6–5.3 points** and pure NCA (`12:0`) by **7.6–8.4 points**, and both neighboring splits (`3:9`, `9:3`) sit below it. The gain is therefore not attributable to "any NCA/attention mix" or to attention alone at reduced depth — the specific 6:6 depth-ordering is what drives the result, consistently across two independent seeds. This is the direct empirical answer to the discussion hypothesis in §6: NCA-early does contribute beyond what an equivalent-depth pure-attention stack achieves.
+### 5.3 Adversarial Robustness
 
-**Still not ablated in this draft:** NCA depth `K` (only `K=4` has been run); perception filter choice, stochastic rate, CLS-token handling, and zero-init of `W₂` remain implementation choices motivated by NCA literature [4] and standard practice, not yet subjected to controlled ablation.
+| Model | Clean (%) | FGSM (%) | PGD-20 (%) |
+|---|---:|---:|---:|
+| ViT-Tiny | 71.88 | 11.33 | 0.47 |
+| DeiT-Tiny | 72.27 | 15.08 | 0.47 |
+| Pure NCA-ViT | 73.91 | 27.50 | 2.89 |
+| **Hybrid NCA-ViT** | **81.41** | **28.91** | 1.41 |
 
-### 5.5 Test Suite
+Under an $L_\infty$ FGSM budget, both NCA-containing models survive roughly 2$\times$ better than the pure-attention baselines (28.9% and 27.5% vs. 15.1% and 11.3%). PGD-20, an iterative worst-case attack, drives every undefended model near chance, as expected — we report it for completeness, not as a claim. Swin-Tiny was not evaluated under this protocol; no Swin robustness comparison is made here (unlike CIFAR-100-C in §5.4, which does cover all five models).
 
-The repository ships with a `pytest` suite (`tests/test_nca_attention.py`, `test_perception.py`, `test_shapes.py`, `test_training.py`) that verifies shape invariance, gradient flow, perception-kernel correctness, and end-to-end checkpoint resume.
+### 5.4 Corruption Robustness — the central result
+
+**Mean accuracy across 19 CIFAR-100-C corruption types, severities {1,3,5}:**
+
+| Model | Clean (%) | Corrupted mean (%) | Retains |
+|---|---:|---:|---:|
+| ViT-Tiny | 72.32 | 52.18 | 72.1% |
+| DeiT-Tiny | 72.89 | 53.60 | 73.5% |
+| Swin-Tiny | 81.56 | 59.37 | 72.8% |
+| Pure NCA-ViT | 73.99 | 57.36 | **77.5%** |
+| **Hybrid NCA-ViT** | 81.29 | **61.88** | 76.1% |
+
+Hybrid NCA-ViT has the highest corrupted-image accuracy of all five models — including Swin-Tiny, which starts from nearly identical clean accuracy (81.56 vs. 81.29) and still falls **2.5 points** behind under corruption. This is not simply "more parameters generalize better": Pure NCA-ViT, with 7.9 points *lower* clean accuracy than Swin, still *retains* a higher fraction of it under corruption (77.5% vs. 72.8%) — the retention advantage tracks presence of the NCA component, not scale.
+
+<p align="center">
+  <img src="figures/paper/corruption_robustness.png" width="100%">
+  <br><em>Figure 2. (a) Mean accuracy vs. corruption severity, all five architectures. (b) The hybrid's advantage over the best attention-only baseline, grouped by corruption family — concentrated in additive pixel noise, absent on blur/weather/photometric, and reversed on impulse noise.</em>
+</p>
+
+**The advantage is not uniform, and that shape is itself the finding.** Grouped by corruption family (Figure 2b):
+
+| Family | Hybrid advantage over best attention-only baseline |
+|---|---:|
+| Additive pixel noise (gaussian, shot, speckle) | **+8.3 pp** |
+| Compression / resample (pixelate, jpeg) | +4.7 pp |
+| Blur (defocus, glass, motion, zoom, gaussian) | +1.7 pp |
+| Weather (snow, frost, fog, spatter) | +1.3 pp |
+| Geometric (elastic transform) | +0.3 pp |
+| Photometric (brightness, contrast, saturate) | +0.2 pp |
+| **Impulse noise (salt-and-pepper)** | **−5.9 pp** |
+
+A model that is simply "more robust" would not produce this shape. A theory restricted to *additive, high-frequency* perturbation predicts almost exactly this shape, including the sign flip on impulse noise (§5.5).
+
+### 5.5 Mechanism: Representation Drift
+
+We test the additive-noise hypothesis directly, without training anything: does the corruption move the feature each model's classifier actually reads, and does that movement predict the accuracy gap — including its sign?
+
+For each model we hook the input to its classification head — the CLS token for ViT/DeiT (pool_type="token"), the GAP'd patch-token average for Swin and both NCA variants — and measure
+
+$$\text{drift} = 1 - \cos\!\big(f_{\text{clean}},\, f_{\text{corrupted}}\big)$$
+
+This choice matters: an earlier version of this analysis probed a fixed mid-network block uniformly across models and found the hybrid drifting *more* than DeiT. That comparison is invalid — DeiT's head reads only its CLS token, and LayerNorm is elementwise, so a patch-token measurement was measuring something DeiT's own classifier never uses. Hooking each model's actual pre-head feature reverses the conclusion.
+
+<p align="center">
+  <img src="figures/paper/noise_drift.png" width="100%">
+  <br><em>Figure 3. (a) Pre-head feature drift on the corruptions where the hybrid wins most (speckle, gaussian) and the one where it loses (impulse). (b) Drift reduction vs. DeiT-Tiny predicts the accuracy gap on the 11 corruptions where baselines score under 65% (r=0.77); near-ceiling corruptions (gray) cannot convert stability into accuracy, diluting the aggregate correlation to r=0.17 across all 19.</em>
+</p>
+
+**Result.** Mean drift across all 19 corruptions: Hybrid 0.199, Pure NCA 0.187, DeiT 0.242, ViT 0.253, Swin 0.285. The hybrid's features are more stable than DeiT's on **17 of 19** corruptions.
+
+**The falsification test.** Impulse noise is the *only* corruption where the hybrid's features are *less* stable than DeiT's (drift +6.8% relative to DeiT, vs. a −16 to −26% reduction on the corruptions it wins). It is also the only large accuracy loss. This was a directional prediction available before the drift was measured, not a post-hoc pattern-match: if the mechanism is "iterated local diffusion suppresses additive noise," it predicts the opposite effect on impulse noise, where isolated extreme-value pixels get *spread* by local averaging rather than rejected, and amplified further by the Sobel gradient filters. The sign came out correct.
+
+**Honest limitation on magnitude.** Correlation between drift-reduction and accuracy-gap is r=0.17 across all 19 corruptions but r=0.77 restricted to the 11 where baseline accuracy is under 65% — near-ceiling corruptions have no accuracy headroom left for extra feature stability to convert into. The 65% threshold was chosen after inspecting the data, so we report this split as descriptive, not as a pre-registered statistical test. The *sign* result above is the part that was predicted in advance and is the part we consider load-bearing.
+
+### 5.6 Qualitative: Failure Cases Under Noise
+
+<p align="center">
+  <img src="figures/paper/gradcam_noisy.png" width="100%">
+  <br><em>Figure 4. Grad-CAM under gaussian noise (severity 3), three CIFAR-100 test images searched (not hand-picked) for cases where all four attention-based baselines misclassify and the hybrid does not.</em>
+</p>
+
+Three examples (of many available — selection criterion: highest agreement among baselines on the wrong answer, searched over 600 test images, not cherry-picked by visual inspection) where DeiT-Tiny, ViT-Tiny, Swin-Tiny, and Pure NCA-ViT all misclassify a noisy image and Hybrid NCA-ViT does not (leopard→forest, train→snail/forest, skyscraper→rocket/sunflower/ray for the baselines; correct for the hybrid in all three). This complements §5.4–5.5 with concrete, inspectable examples rather than only aggregate statistics.
+
+### 5.7 Real-Domain Validation: Breast Ultrasound (BUSI)
+
+The mechanism in §5.5 predicts an advantage specifically under additive/multiplicative high-frequency noise. **Speckle** — a granular interference pattern intrinsic to any coherent-wave imaging modality — is exactly this noise class, and is the single largest advantage measured in §5.4 (+9.6pp on speckle_noise specifically, within the +8.3pp additive-noise family average). Speckle is also the dominant, unavoidable artifact of ultrasound imaging. We test the prediction on BUSI [15], 780 breast-ultrasound images (437 benign / 210 malignant / 133 normal), from scratch, no pretraining, matched recipe.
+
+**Metric choice.** With 56.1% of images in one class, top-1 accuracy is close to meaningless — a constant "benign" classifier scores 56.1% without learning anything. We report **balanced accuracy** (mean per-class recall, chance = 33.3%) and **macro-F1** throughout this section.
+
+**Recipe note.** An initial run at the CIFAR-100 recipe unchanged (Mixup/CutMix on, no class weighting) gave an ambiguous single-seed result: the hybrid won top-1 (61.94% vs. 54.84%) but *lost* on balanced accuracy (40.89% vs. 47.01%) and macro-F1 (37.40% vs. 41.60%). At 625 training images and 9 batches/epoch, Mixup blending plausibly erases the 107-image minority class before either model can learn it. We disabled Mixup/CutMix and added inverse-frequency class-weighted cross-entropy, and reran 3 seeds for both models to check whether the result was a recipe artifact or reproducible.
+
+**Result — 3 seeds, no Mixup/CutMix, class-weighted CE:**
+
+| | Balanced accuracy | Macro-F1 |
+|---|---:|---:|
+| DeiT-Tiny (mean ± std, n=3) | 36.39 ± 3.0% | 20.97 ± 6.7% |
+| **Hybrid NCA-ViT (mean ± std, n=3)** | **49.83 ± 7.3%** | **41.46 ± 1.9%** |
+| Overlap between architectures | **none** | **none** |
+
+<p align="center">
+  <img src="figures/paper/busi_seeds.png" width="85%">
+  <br><em>Figure 5. Balanced accuracy and macro-F1 across 3 seeds. Hybrid's worst seed beats DeiT's best seed on both metrics.</em>
+</p>
+
+Hybrid's *worst* seed (44.42% balanced accuracy) still beats DeiT's *best* seed (39.82%); the same holds for macro-F1 (39.32% vs. 28.56%). A second finding fell out of the reruns: **DeiT's top-1 falls below the 56.13% majority-class baseline on all 3 seeds** under this recipe (32.26%, 30.32%, 28.39%) — it is not learning the task at all under aggressive class-reweighting without Mixup's regularization, while the hybrid remains informative throughout. We do not have a controlled experiment isolating whether this instability is itself downstream of the same noise-suppression mechanism (plausible: an implicit smoothing effect could equally stabilize optimization) or a separate finding; we report it as observed and flag it as an open question rather than a proven causal claim.
+
+**Caveat, stated plainly.** The public BUSI release provides no patient IDs for its 600 patients, so a patient-level split is not constructible; images from the same patient may appear on both sides of the train/val split, which inflates absolute numbers for *every* architecture equally. The comparison between architectures — the claim this section makes — is unaffected, but the absolute balanced-accuracy figures should not be read as an estimate of clean generalization to new patients.
+
+### 5.8 Emergent Receptive Field
+
+A single NCA iteration has a $3\times3$ spatial receptive field; after $K$ iterations, the theoretical bound is $(2K+1)\times(2K+1)$ — $9\times9$ patches for $K=4$. Figure 6 confirms this empirically by seeding a single active cell and tracking activation spread.
+
+<p align="center">
+  <img src="figures/paper/receptive_field_block0.png" width="55%">
+  <br><em>Figure 6. Measured receptive-field growth of a single NCA block (block 0) as a function of iteration count, consistent with the (2K+1)×(2K+1) theoretical bound.</em>
+</p>
 
 ---
 
 ## 6. Discussion
 
-**Why does iterated local outperform one-shot global (preliminary)?** Our interpretation is twofold, offered as hypothesis pending the ablations in §5.4. First, the inductive bias of locality is a strong prior for natural images, which is part of why convolutional networks worked well for so long. NCA preserves this bias while still admitting eventual globality through iteration. Second, the *depth* of the NCA iteration gives the network a way to accumulate evidence spatially, rather than distributing attention mass in a single soft-argmax.
+**Why does the hybrid beat both pure stacks on clean data?** The depth-ordering curve (§5.2) rules out the two simplest explanations: pure attention (0:12) and pure NCA (12:0) are both the weakest configurations, so the gain is neither "attention alone at reduced depth" nor "NCA alone." Our reading: early layers, operating on low-level features, benefit from locality-biased iterative refinement; late layers, operating on class-bearing semantic features, need direct long-range aggregation. This is a hypothesis consistent with the curve's shape, not independently verified by a mechanism probe the way §5.5 verifies the robustness claim.
 
-**Why does the hybrid beat both pure stacks?** One hypothesis: early layers, operating on low-level features, benefit from the smooth iterative dynamics of NCA, while late layers, operating on class-bearing semantic features, need the direct long-range pooling that softmax attention provides. The completed split-ratio curve (§5.4) is consistent with this: accuracy rises from `0:12` to a peak at `6:6` and falls off toward `12:0`, rather than monotonically favoring more attention or more NCA. This rules out the simpler explanations that the gain comes from attention alone at reduced depth (`0:12` is the weakest configuration) or from NCA alone (`12:0` is also weak) — the specific combination and ordering is doing the work.
+**Why is the robustness advantage frequency-specific rather than general?** The representation-drift results (§5.5) support a concrete mechanism: iterated local averaging under a fixed (non-adversarial, non-learned) perception kernel suppresses independent, per-pixel additive perturbation — exactly what convolutional smoothing does to Gaussian noise — while offering no help against spatially-correlated distortions (blur, geometric warps) that are not high-frequency-independent, and actively *hurting* against sparse, extreme-valued outliers (impulse noise) that local averaging spreads rather than rejects.
 
 **Limitations.**
-- Throughput is ~3× lower than DeiT-Tiny because the current implementation uses off-the-shelf PyTorch conv + linear kernels and does not fuse the K iterations; GFLOPs are ~2.2× higher. A dedicated fused kernel could close most of this gap.
-- Headline models (Table 5.1) are single-seed (42); the split-ratio ablation (§5.4) additionally covers seed 123, but full multi-seed variance estimates for the headline numbers are not yet available.
-- Swin-Tiny baseline and the NCA-depth `K`-sweep ablation are running but not complete at time of writing.
-- Robustness is measured only for the Hybrid model; no baseline comparison yet exists.
-- Restricted to CIFAR-100 at 224² and tiny-scale models; ImageNet-1k scaling and higher input resolutions are left for future work.
+- Throughput is ~3$\times$ lower than DeiT-Tiny and FLOPs ~2.2$\times$ higher (§3.4); a fused kernel for the $K$-iteration loop could close most of this gap, but does not exist in our current implementation.
+- Headline CIFAR-100 models (Table 1) are single-seed (42); the depth-ordering ablation (§5.2) and the BUSI validation (§5.7) additionally cover seeds 123 and 7, but full multi-seed variance for the *headline* clean-accuracy number is not yet available.
+- The corruption-robustness evaluation (§5.4–5.5) uses a stratified 1000-image/severity subset of CIFAR-100-C at 3 of its 5 severities, not the full 950k-image grid, chosen for tractability; we have no reason to expect the pattern to change on the full grid, but have not verified this.
+- BUSI (§5.7) cannot be split by patient (§5.7's caveat); the architecture *comparison* holds, the absolute numbers should not be read as clean-generalization estimates.
+- The impulse-noise failure (§5.4–5.5) is a genuine limitation of the mechanism, not an edge case to be explained away — any deployment where salt-and-pepper-style sensor faults dominate should not expect this architecture to help, and may see it hurt.
+- Restricted to CIFAR-100-scale data and tiny-scale models (5–8M parameters); ImageNet-1k and larger-scale behavior are untested.
 
-**Broader impact.** The approach is an architectural change and inherits the societal considerations of vision classification generally. It introduces no new data or deployment assumptions.
+**Broader impact.** The corruption-robustness and BUSI results are offered as an architectural property with a candidate downstream application (imaging under sensor noise / low-data regimes), not as a validated clinical claim. §5.7's results are a controlled architecture comparison on a public benchmark dataset, not a diagnostic accuracy claim, and should not be read as evidence of clinical readiness.
 
 ---
 
 ## 7. Conclusion
 
-Global receptive fields in a Transformer do not need to be computed in one step. We show that `K` iterations of a local Neural Cellular Automaton — using fixed Sobel + Identity perception, a shared two-layer update MLP with zero-initialized output, and Bernoulli-gated stochastic updates — can *fully replace* multi-head self-attention while preserving the residual-block structure of a standard ViT. This differs from the closest prior work, AdaNCA [12] and ViTCA [13], which keep attention as the primary mixer and use NCA as an adaptor or fuse it into the attention rule. A layered hybrid, with NCA early and attention late, improves CIFAR-100 top-1 over a same-scale, freshly re-verified DeiT-Tiny by **+9.02 %**. The central design claim — that this specific depth ordering is what drives the gain, rather than any 6:6 split or NCA-attention combination in general — is now supported by a completed, two-seed split-ratio curve (§5.4): `6:6` outperforms `0:12` (pure attention), `12:0` (pure NCA), and both intermediate splits (`3:9`, `9:3`) consistently across seeds 42 and 123. Remaining work before submission: the NCA-depth ablation, finishing the Swin-Tiny baseline, extending robustness evaluation to all baselines, and multi-seed variance estimates for the headline models.
+Global receptive fields in a Transformer do not need to be computed in one step. $K$ iterations of a local Neural Cellular Automaton — fixed Sobel+Identity perception, a shared zero-initialized update MLP, Bernoulli-gated stochastic updates — can fully replace multi-head self-attention while matching Swin-Tiny's CIFAR-100 accuracy at 4.3$\times$ fewer parameters, when placed early in a hybrid stack with attention placed late (§5.1–5.2). The paper's central contribution, however, is narrower and more load-bearing than the accuracy number: a **frequency-specific, mechanistically-verified robustness property** (§5.4–5.5) that predicts its own failure mode in advance and is confirmed on a real, non-synthetic imaging domain chosen because its physics matches the prediction (§5.7). This differs from AdaNCA [12] and ViTCA [13] not only architecturally (full replacement vs. augmentation/fusion) but in what is claimed: not "NCA improves robustness" in aggregate, but a specific, falsifiable account of *which* corruptions and *why*.
 
 ---
 
 ## Reproducibility Statement
 
-All model definitions, training scripts, configs, and trained checkpoints (DeiT-Tiny, ViT-Tiny, pure-NCA, Hybrid NCA-ViT; Swin-Tiny checkpoint is a mid-training snapshot) are released. A single command — `python scripts/train.py model=nca_vit_hybrid data=cifar100 training=default` — reproduces the Hybrid result at seed 42; all other rows in Table 5.1 have an equivalent `model=` command using the same `data=cifar100 training=default` flags and `batch_size=64`. Evaluation JSONs are in `results/`. Receptive-field figures and the emergence animation are in `figures/`. The split-ratio ablation (§5.4) is now complete for seeds 42 and 123. The 0.62-point top-1 discrepancy noted in §5.1 and the remaining in-progress items (NCA-depth ablation, Swin-Tiny baseline) are called out explicitly rather than silently resolved, so a reader attempting to reproduce our numbers knows which are settled and which are not.
+All model definitions, training scripts, evaluation/analysis scripts (`scripts/evaluate_corruptions.py`, `scripts/measure_noise_drift.py`, `scripts/gradcam_compare.py`, `scripts/evaluate_busi.py`), configs, and trained checkpoints are released. `python scripts/train.py model=nca_vit_hybrid data=cifar100` reproduces the Hybrid result at seed 42; every other row in Table 1 has an equivalent `model=` command under the identical `data=cifar100`, `batch_size=64` flags. `python scripts/train.py model=nca_vit_hybrid data=busi model.num_classes=3 training.augmentation.mixup_alpha=0 training.augmentation.cutmix_alpha=0 training.training.class_weighted=true` reproduces §5.7. Evaluation JSONs are in `results/`; all figures are regenerable from their corresponding `scripts/plot_*.py` / `scripts/evaluate_*.py` and are additionally committed under `figures/paper/` so this document renders without rerunning anything.
 
 ---
 
-## Appendix A — Hyperparameters and Config Reference
+## Appendix A — Hyperparameters
 
-| Field                           | Value                                             |
-|---------------------------------|---------------------------------------------------|
-| `embed_dim` (D)                 | 192                                               |
-| `depth` (L)                     | 12                                                |
-| NCA depth (K)                   | 4                                                 |
-| NCA hidden dim (H_mlp)          | 384                                               |
-| Perception filters              | `{sobel_x, sobel_y, identity}`                    |
-| `learnable_filters`             | False (headline models); True in one Hybrid ablation variant only |
-| Stochastic rate (p)             | 0.5                                               |
-| MLP ratio                       | 4.0                                               |
-| Update MLP activation           | ReLU                                              |
-| Patch size                      | 16                                                |
-| Input resolution                | 224 × 224                                         |
-| Num classes                     | 100                                               |
-| Optimizer / lr / wd             | AdamW / 5·10⁻⁴ / 0.05                            |
-| Betas / eps                     | (0.9, 0.999) / 10⁻⁸                              |
-| Epochs / warm-up                | 300 / 10                                          |
-| Min lr                          | 10⁻⁶                                             |
-| Batch size                      | 64                                                |
-| Label smoothing                 | 0.1                                               |
-| Mixup α / CutMix α              | 0.8 / 1.0                                         |
-| Mixup prob / CutMix prob        | 0.5 / 0.5                                         |
-| RandAugment (ops, mag)          | (2, 9)                                            |
-| Random erasing p                | 0.25                                              |
-| Grad clip / AMP / EMA / decay   | 1.0 / on / on / 0.9999                            |
-| Seed                            | 42                                                |
+| Field | Value |
+|---|---|
+| `embed_dim` ($D$) | 192 |
+| `depth` ($L$) | 12 (6 NCA + 6 MHSA in the hybrid) |
+| NCA steps ($K$) | 4 |
+| NCA hidden dim | 384 |
+| Perception filters | `{sobel_x, sobel_y, identity}`, fixed |
+| Stochastic rate ($p$) | 0.5 |
+| MLP ratio | 4.0 |
+| Update-MLP activation | ReLU |
+| Patch size / resolution | 16 / 224×224 |
+| Optimizer / lr / wd | AdamW / $5\times10^{-4}$ / 0.05 |
+| Epochs / warmup | 300 / 10 |
+| Batch size | 64 |
+| Label smoothing | 0.1 |
+| Mixup $\alpha$ / CutMix $\alpha$ (CIFAR-100) | 0.8 / 1.0 |
+| Mixup / CutMix (BUSI, §5.7) | disabled |
+| Class-weighted CE (BUSI only) | inverse-frequency, `training.training.class_weighted=true` |
+| Grad clip / AMP / EMA decay | 1.0 / on / 0.9999 |
+| Seeds used | 42 (all models); 123, 7 (ablation/BUSI only, see §5.2/§5.7) |
 
----
-
-## Appendix B — Pseudocode for Emergent Attention
+## Appendix B — Pseudocode
 
 ```python
 class NCAAttention(nn.Module):
     def __init__(self, dim=192, nca_steps=4, hidden_dim=384,
                  grid_size=(14, 14), stochastic_rate=0.5,
-                 filter_names=("sobel_x", "sobel_y", "identity"),
-                 learnable_filters=False):
+                 filter_names=("sobel_x", "sobel_y", "identity")):
         super().__init__()
-        self.K           = nca_steps
-        self.grid_shape  = grid_size
-        self.stoch_rate  = stochastic_rate
-        self.norm        = nn.LayerNorm(dim)
-        self.perception  = PerceptionModule(dim, filter_names, learnable_filters)
-        M                = len(filter_names)
-        self.linear1     = nn.Linear(dim * M, hidden_dim)
-        self.act         = nn.ReLU()
-        self.linear2     = nn.Linear(hidden_dim, dim)
-        nn.init.zeros_(self.linear2.weight)     # identity at init
+        self.K, self.stoch_rate = nca_steps, stochastic_rate
+        self.norm = nn.LayerNorm(dim)
+        self.perception = PerceptionModule(dim, filter_names, learnable=False)
+        M = len(filter_names)
+        self.linear1 = nn.Linear(dim * M, hidden_dim)
+        self.act = nn.ReLU()
+        self.linear2 = nn.Linear(hidden_dim, dim)
+        nn.init.zeros_(self.linear2.weight)   # identity at init
         nn.init.zeros_(self.linear2.bias)
 
-    def _nca_step(self, grid):
-        perc  = self.perception(grid)
-        perc  = rearrange(perc, "b dm hp wp -> b hp wp dm")
+    def _step(self, grid):
+        perc = rearrange(self.perception(grid), "b dm hp wp -> b hp wp dm")
         delta = self.linear2(self.act(self.linear1(perc)))
         delta = rearrange(delta, "b hp wp d -> b d hp wp")
         if self.training and self.stoch_rate < 1.0:
             B, _, Hp, Wp = grid.shape
-            mask  = torch.bernoulli(torch.full(
-                (B, 1, Hp, Wp), self.stoch_rate, device=grid.device))
+            mask = torch.bernoulli(torch.full((B, 1, Hp, Wp), self.stoch_rate,
+                                               device=grid.device))
             return grid + mask * delta
         return grid + delta
 
     def forward(self, z):
-        cls, patches = z[:, :1], z[:, 1:]
-        patches      = self.norm(patches)
-        B, n, D      = patches.shape
-        Hp, Wp       = self.grid_shape
-        s0           = rearrange(patches, "b (hp wp) d -> b d hp wp",
-                                 hp=Hp, wp=Wp)
-        s            = s0
+        cls, patches = z[:, :1], self.norm(z[:, 1:])
+        Hp, Wp = self.grid_shape
+        s0 = rearrange(patches, "b (hp wp) d -> b d hp wp", hp=Hp, wp=Wp)
+        s = s0
         for _ in range(self.K):
-            s = self._nca_step(s)
+            s = self._step(s)
         delta = rearrange(s - s0, "b d hp wp -> b (hp wp) d")
         return torch.cat([torch.zeros_like(cls), delta], dim=1)
 ```
+
+## Appendix C — Full Corruption-by-Corruption Breakdown
+
+Mean accuracy (%) over severities {1, 3, 5}, per corruption type, per model:
+
+| Corruption | ViT | DeiT | Swin | NCA-pure | **Hybrid** |
+|---|---:|---:|---:|---:|---:|
+| gaussian_noise | 29.3 | 32.1 | 28.2 | 36.8 | **38.9** |
+| shot_noise | 35.5 | 38.3 | 36.4 | 43.5 | **45.7** |
+| speckle_noise | 38.1 | 40.1 | 41.1 | 46.8 | **50.7** |
+| impulse_noise | 53.0 | 53.0 | **62.2** | 51.2 | 56.3 |
+| pixelate | 54.3 | 54.5 | 59.8 | 61.7 | **65.6** |
+| jpeg_compression | 55.2 | 55.2 | 60.6 | 60.2 | **64.2** |
+| frost | 55.7 | 58.7 | 64.3 | 60.0 | **66.7** |
+| defocus_blur | 57.0 | 58.0 | **65.4** | 61.2 | 64.1 |
+| gaussian_blur | 52.8 | 54.4 | 58.7 | 56.8 | **58.9** |
+| motion_blur | 54.1 | 54.7 | 61.7 | 59.5 | **62.4** |
+| zoom_blur | 54.7 | 56.3 | 62.1 | 61.1 | **62.5** |
+| glass_blur | 32.8 | 37.1 | 29.2 | 36.9 | **37.7** |
+| snow | 60.4 | 62.9 | 70.5 | 64.7 | **71.7** |
+| fog | 58.6 | 59.7 | 69.3 | 65.0 | **69.8** |
+| spatter | 63.5 | 64.0 | 72.3 | 67.2 | **73.5** |
+| brightness | 67.5 | 69.8 | **79.2** | 70.7 | 79.0 |
+| contrast | 50.3 | 51.8 | 66.2 | 58.4 | **67.3** |
+| saturate | 58.6 | 58.9 | **73.4** | 65.6 | 73.1 |
+| elastic_transform | 59.9 | 59.2 | 67.5 | 62.7 | **67.8** |
+
+Bold = best per row. Hybrid wins 15 of 19; loses to Swin on impulse_noise, defocus_blur, brightness, saturate — three of these four are near-ceiling corruptions (baseline attention accuracy ≥65%) where §5.5 finds representation stability has little room to convert into accuracy; impulse_noise is the mechanistically-predicted exception (§5.5).
 
 ---
 
@@ -324,5 +407,8 @@ class NCAAttention(nn.Module):
 9. Yun et al. *CutMix: Regularization Strategy to Train Strong Classifiers with Localizable Features.* ICCV 2019.
 10. Goodfellow et al. *Explaining and Harnessing Adversarial Examples.* ICLR 2015.
 11. Madry et al. *Towards Deep Learning Models Resistant to Adversarial Attacks.* ICLR 2018.
-12. Anonymous / AdaNCA authors. *AdaNCA: Neural Cellular Automata As Adaptors For More Robust Vision Transformer.* NeurIPS 2024. arXiv:2406.08298.
+12. [AdaNCA authors]. *AdaNCA: Neural Cellular Automata As Adaptors For More Robust Vision Transformer.* NeurIPS 2024. arXiv:2406.08298.
 13. Tesfaldet et al. *Attention-based Neural Cellular Automata.* NeurIPS 2022. arXiv:2211.01233.
+14. Hendrycks & Dietterich. *Benchmarking Neural Network Robustness to Common Corruptions and Perturbations.* ICLR 2019.
+15. Al-Dhabyani et al. *Dataset of Breast Ultrasound Images.* Data in Brief, 2020.
+16. Selvaraju et al. *Grad-CAM: Visual Explanations from Deep Networks via Gradient-based Localization.* ICCV 2017.

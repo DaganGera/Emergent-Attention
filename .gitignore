@@ -34,6 +34,11 @@ results/*.json
 figures/*.png
 figures/*.pdf
 figures/*.gif
+# Exception: the curated figures paper.md actually embeds. Regenerable from
+# scripts/plot_*.py, but committed anyway so the paper renders on GitHub for
+# a reader who just cloned the repo, instead of showing broken image links.
+!figures/paper/
+!figures/paper/*.png
 
 # Jupyter
 .ipynb_checkpoints/
