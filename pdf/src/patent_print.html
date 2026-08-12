@@ -160,7 +160,11 @@
 </div>
 <div class="note risk">
   <span class="tag">Legal risk 2</span>
-  <p><b>Section 3(i) &mdash; diagnostic method exclusion.</b> Claim 5 involves medical ultrasound. It is worded as a system/apparatus and image-classification claim, not "a method of diagnosing a patient." <b>Have the patent agent confirm this framing survives 3(i) scrutiny before filing</b> &mdash; this is a legal call, not an engineering one.</p>
+  <p><b>Section 3(i) &mdash; diagnostic method exclusion.</b> Claims 5 and 6 are the domain-oriented claims and both involve medical/diagnostic imaging contexts. Both are worded as system/apparatus claims &mdash; configured to process a stated class of images and produce a classification output &mdash; not "a method of diagnosing a patient"; Claim 5 was rewritten from an earlier method-claim draft specifically to reduce this exposure. Claim 5's "diagnostic categories" language is still the part most likely to draw 3(i) scrutiny. <b>Have the patent agent confirm this framing survives 3(i) scrutiny before filing</b> &mdash; this is a legal call, not an engineering one.</p>
+</div>
+<div class="note watch">
+  <span class="tag">Claim scope vs. evidence</span>
+  <p><b>Claim 6 generalizes beyond what was tested.</b> It extends the technical effect to synthetic aperture radar, sonar, and optical coherence tomography on the strength of a shared physical mechanism (speckle from coherent-wave interference, &sect;6) &mdash; only medical ultrasound (BUSI) was empirically evaluated. This is a legitimate claim-drafting choice (broader scope, weaker direct evidentiary support per domain) but the patent agent and mentor should decide together whether to keep Claim 6 broad or narrow it to ultrasound only before filing.</p>
 </div>
 <div class="note ok">
   <span class="tag">Already decided</span>
@@ -170,17 +174,18 @@
 
 <!-- ============ SECTION 2 ============ -->
 <h2 class="sec-h"><span class="num">&sect;2</span>Claims at a Glance</h2>
-<p class="lede">Six claims: one independent system claim, five dependent. Full legal wording is in &sect;7 &mdash; this table is for a fast read.</p>
+<p class="lede">Seven claims: one independent system claim, six dependent &mdash; two of them anchored in a real, physical noise-generating imaging domain rather than a synthetic benchmark. Full legal wording is in &sect;7 &mdash; this table is for a fast read.</p>
 
 <table class="datatable">
   <thead><tr><th style="width:6%;">#</th><th style="width:20%;">Covers</th><th>Plain-English summary</th></tr></thead>
   <tbody>
-    <tr><td><b>1</b></td><td>Independent<br>system claim</td><td>An image classifier with two stages: local iterated updates (fixed perception + zero-init update network + stochastic gating) followed by global self-attention &mdash; and it retains more accuracy than an attention-only system when the input has additive high-frequency noise.</td></tr>
+    <tr><td><b>1</b></td><td>Independent<br>system claim</td><td>An image classifier with two stages: local iterated updates (fixed perception + zero-init update network + stochastic gating) followed by global self-attention &mdash; framed for noisy-sensor imaging domains (ultrasound, radar, sonar) &mdash; and it retains more accuracy than an attention-only system when the input has additive high-frequency noise.</td></tr>
     <tr><td><b>2</b></td><td>Dependent</td><td>The local stage's perception uses three fixed (non-learned) filters: horizontal gradient, vertical gradient, identity.</td></tr>
     <tr><td><b>3</b></td><td>Dependent</td><td>The local and global stages are roughly equal in size, local stage first &mdash; and this specific ordering is what produces the accuracy gain, not just "having both."</td></tr>
     <tr><td><b>4</b></td><td>Dependent</td><td>The local stage's update network is zero-initialized, so it starts training as a pure identity mapping.</td></tr>
-    <tr><td><b>5</b></td><td>Dependent &mdash;<br>applied embodiment</td><td>Applied to medical ultrasound: the "additive high-frequency noise" is <b>speckle</b>, ultrasound's dominant physical artifact &mdash; this is the claim carrying the &sect;3(k) technical-effect argument.</td></tr>
-    <tr><td><b>6</b></td><td>Dependent</td><td>Classification pools patch tokens only; the network's classification token is never used, closing an obvious design-around.</td></tr>
+    <tr><td><b>5</b></td><td>Dependent &mdash;<br>domain embodiment</td><td>Configured for medical ultrasound specifically: the "additive high-frequency noise" is <b>speckle</b>, ultrasound's dominant physical artifact &mdash; this is the claim carrying the &sect;3(k) technical-effect argument, empirically tested end-to-end.</td></tr>
+    <tr><td><b>6</b></td><td>Dependent &mdash;<br>domain generalization</td><td>Extends the same claim to any coherent-wave imaging modality &mdash; ultrasound, synthetic aperture radar, sonar, OCT &mdash; on the strength of the shared speckle mechanism. Broader scope than Claim 5; only ultrasound was actually tested (see &sect;1 caveat).</td></tr>
+    <tr><td><b>7</b></td><td>Dependent</td><td>Classification pools patch tokens only; the network's classification token is never used, closing an obvious design-around.</td></tr>
   </tbody>
 </table>
 
@@ -258,7 +263,7 @@
 <p>Directly measured how far each architecture's internal representation moves under each corruption type. The invention's representation moves <b>16&ndash;26% less</b> than the baseline's on the corruption categories where it wins, and moves <i>more</i> &mdash; not less &mdash; on the one category (impulse noise) where it loses. This sign-correspondence between an internal measurement and the external accuracy result is direct evidence of a working mechanism, not an unexplained correlation.</p>
 
 <!-- ============ SECTION 6 ============ -->
-<h2 class="sec-h"><span class="num">&sect;6</span>Applied Embodiment: Medical Ultrasound</h2>
+<h2 class="sec-h"><span class="num">&sect;6</span>Applied Embodiment: Medical Ultrasound (Claims 5&ndash;6)</h2>
 <p class="lede">Speckle &mdash; the single largest measured advantage (+9.6 points) &mdash; is also the dominant, physically unavoidable artifact of ultrasound image acquisition. Not an analogy: the same noise process.</p>
 
 <p>Tested on BUSI, a public breast-ultrasound dataset (780 images, 3 diagnostic categories, 600 patients), trained from random initialization, against a size-matched baseline, at three independent random seeds:</p>
@@ -276,6 +281,11 @@
 
 <p style="font-size:9.5pt;">This constitutes a demonstrated technical effect on a real, non-synthetic applied domain &mdash; satisfying the requirement that the invention solve a concrete technical problem in a stated field, not only improve an abstract benchmark metric.</p>
 
+<div class="note watch">
+  <span class="tag">Domain generalization &mdash; Claim 6</span>
+  <p>Speckle is not unique to ultrasound: it arises whenever coherent waves are reflected or backscattered and interfere with one another, which is why synthetic aperture radar, sonar, and optical coherence tomography all exhibit the same noise process by the same physical mechanism. Claim 6 extends the invention's claimed effect to this whole class of imaging modalities on that physical basis. Only ultrasound was trained and evaluated (above); the other modalities are argued from shared physics, not separately tested &mdash; stated plainly here and flagged for the patent agent in &sect;1.</p>
+</div>
+
 <!-- ============ SECTION 7 ============ -->
 <h2 class="sec-h"><span class="num">&sect;7</span>Formal Claims</h2>
 <div class="note watch">
@@ -284,7 +294,7 @@
 </div>
 
 <div class="claim-label">Claim 1 &mdash; Independent (system)</div>
-<div class="claim-block">A computer-implemented image classification system comprising: <b>(a)</b> a patch embedding stage configured to divide an input image into a plurality of patches and produce a corresponding sequence of patch tokens, together with a designated classification token; <b>(b)</b> a first plurality of processing blocks configured to iteratively update the patch tokens over K iterations, wherein each iteration comprises: applying a fixed, non-learned spatial perception operation to the patch tokens arranged on a spatial grid; processing the resulting perception output through an update network shared identically across all spatial locations, said update network having an output layer initialized to zero-valued weights and biases; and applying the resulting update to the patch tokens, gated during a training phase by an independently-sampled random binary mask per spatial location and applied without gating during an inference phase; wherein the designated classification token does not participate in said iterative updating; <b>(c)</b> a second plurality of processing blocks, positioned after the first plurality of processing blocks in processing order, configured to perform multi-head self-attention across the full sequence of patch tokens and the classification token; and <b>(d)</b> a classification head configured to pool the patch tokens, following processing by the first and second pluralities of processing blocks, and to produce a classification output therefrom; wherein the system exhibits, relative to a comparable image classification system employing multi-head self-attention throughout without said first plurality of processing blocks, an increased retention of classification accuracy when the input image is degraded by additive high-frequency pixel-noise.</div>
+<div class="claim-block">A computer-implemented image classification system, particularly suited for classifying images acquired via noisy-sensor imaging modalities including medical ultrasound, synthetic aperture radar, sonar, and other coherent-wave imaging systems, the system comprising: <b>(a)</b> a patch embedding stage configured to divide an input image into a plurality of patches and produce a corresponding sequence of patch tokens, together with a designated classification token; <b>(b)</b> a first plurality of processing blocks configured to iteratively update the patch tokens over K iterations, wherein each iteration comprises: applying a fixed, non-learned spatial perception operation to the patch tokens arranged on a spatial grid; processing the resulting perception output through an update network shared identically across all spatial locations, said update network having an output layer initialized to zero-valued weights and biases; and applying the resulting update to the patch tokens, gated during a training phase by an independently-sampled random binary mask per spatial location and applied without gating during an inference phase; wherein the designated classification token does not participate in said iterative updating; <b>(c)</b> a second plurality of processing blocks, positioned after the first plurality of processing blocks in processing order, configured to perform multi-head self-attention across the full sequence of patch tokens and the classification token; and <b>(d)</b> a classification head configured to pool the patch tokens, following processing by the first and second pluralities of processing blocks, and to produce a classification output therefrom; wherein the system exhibits, relative to a comparable image classification system employing multi-head self-attention throughout without said first plurality of processing blocks, an increased retention of classification accuracy when the input image is degraded by additive high-frequency pixel-noise, including speckle noise characteristic of coherent-wave image acquisition.</div>
 
 <div class="claim-label">Claim 2 &mdash; dependent on Claim 1</div>
 <div class="claim-block">The system of Claim 1, wherein the fixed spatial perception operation comprises three depthwise-convolutional filters applied per channel: a horizontal spatial-gradient filter, a vertical spatial-gradient filter, and an identity filter, the weights of said filters remaining fixed and non-learned throughout a training procedure.</div>
@@ -295,15 +305,18 @@
 <div class="claim-label">Claim 4 &mdash; dependent on Claim 1</div>
 <div class="claim-block">The system of Claim 1, wherein the update network comprises a first linear transformation, followed by a nonlinear activation function, followed by a second linear transformation, and wherein the zero-initialization of the second linear transformation's weights and bias causes each of the first plurality of processing blocks to perform an identity mapping at the commencement of a training procedure.</div>
 
-<div class="claim-label">Claim 5 &mdash; dependent on Claim 1 (applied embodiment)</div>
-<div class="claim-block">A method of classifying a medical ultrasound image using the system of Claim 1, wherein the additive high-frequency pixel-noise comprises speckle noise arising from coherent-wave ultrasound image acquisition, and wherein the system produces a diagnostic-category classification output with increased retention of classification accuracy relative to a comparable image classification system employing multi-head self-attention throughout, when applied to ultrasound images exhibiting said speckle noise.</div>
+<div class="claim-label">Claim 5 &mdash; dependent on Claim 1 (medical ultrasound embodiment)</div>
+<div class="claim-block">The system of Claim 1, wherein the system is configured to receive as input a medical ultrasound image and to produce a classification output corresponding to one of a plurality of diagnostic categories, wherein the additive high-frequency pixel-noise comprises speckle noise arising from coherent-wave ultrasound image acquisition, and wherein the system exhibits increased retention of classification accuracy, relative to a comparable image classification system employing multi-head self-attention throughout, when applied to ultrasound images exhibiting said speckle noise.</div>
 
-<div class="claim-label">Claim 6 &mdash; dependent on Claim 1</div>
+<div class="claim-label">Claim 6 &mdash; dependent on Claim 1 (coherent-wave imaging domain, generalized)</div>
+<div class="claim-block">The system of Claim 1, wherein the input image is acquired via a coherent-wave imaging modality selected from the group consisting of medical ultrasound, synthetic aperture radar, sonar, and optical coherence tomography, and wherein the additive high-frequency pixel-noise comprises speckle noise intrinsic to said coherent-wave image acquisition, said speckle noise arising from constructive and destructive interference of reflected or backscattered coherent waves.</div>
+
+<div class="claim-label">Claim 7 &mdash; dependent on Claim 1</div>
 <div class="claim-block">The system of Claim 1, wherein the classification head is configured to pool the patch tokens by averaging, excluding the classification token, such that the classification output is independent of any representation carried by the classification token.</div>
 
 <!-- ============ SECTION 8 ============ -->
 <h2 class="sec-h"><span class="num">&sect;8</span>Abstract (Filing Format, &asymp;150 words)</h2>
-<div class="claim-block">An image classification system comprises a first plurality of processing blocks performing iterated, spatially-local updates using a fixed, non-learned perception operation and a zero-initialized, stochastically-gated update network, followed by a second plurality of processing blocks performing global multi-head self-attention. Ablation across five stage-ordering configurations at two independent random seeds confirms that positioning the local-update blocks before the attention blocks, at approximately equal depth split, maximizes classification accuracy. Evaluated against attention-only baseline architectures across nineteen categories of image corruption, the system demonstrates a classification-accuracy retention advantage concentrated specifically in additive high-frequency pixel-noise corruption, verified by direct measurement of internal representation stability. Applied to medical ultrasound image classification &mdash; where speckle noise, the corruption category showing the largest measured advantage, is the dominant acquisition artifact &mdash; the system outperforms a comparable self-attention baseline across three independent trained instances with non-overlapping performance ranges.</div>
+<div class="claim-block">An image classification system, particularly suited to noisy-sensor imaging domains such as medical ultrasound, synthetic aperture radar, and sonar, comprises a first plurality of processing blocks performing iterated, spatially-local updates using a fixed, non-learned perception operation and a zero-initialized, stochastically-gated update network, followed by a second plurality of processing blocks performing global multi-head self-attention. Ablation across five stage-ordering configurations at two independent random seeds confirms that positioning the local-update blocks before the attention blocks, at approximately equal depth split, maximizes classification accuracy. Evaluated against attention-only baseline architectures across nineteen categories of image corruption, the system demonstrates a classification-accuracy retention advantage concentrated specifically in additive high-frequency pixel-noise corruption, verified by direct measurement of internal representation stability. The demonstrated effect is grounded in a physical noise-generation mechanism &mdash; speckle, arising from coherent-wave interference &mdash; common to multiple real imaging modalities. Configured for medical ultrasound image classification, where speckle is the dominant acquisition artifact, the system outperforms a comparable self-attention baseline across three independent trained instances with non-overlapping performance ranges.</div>
 
 <!-- ============ SECTION 9 ============ -->
 <h2 class="sec-h"><span class="num">&sect;9</span>Evidence Index</h2>
@@ -313,7 +326,8 @@
   <tr><td>&sect;4 stage-ordering table</td><td>checkpoints/nca_vit_hybrid/cifar100/seed{42,123}/</td><td>python scripts/train.py model=nca_vit_hybrid model.nca_depth=N model.attn_depth=M data=cifar100</td></tr>
   <tr><td>&sect;5 corruption results</td><td>results/cifar100c_robustness.json</td><td>python scripts/evaluate_corruptions.py</td></tr>
   <tr><td>&sect;5 mechanism / drift</td><td>results/noise_drift.json</td><td>python scripts/measure_noise_drift.py</td></tr>
-  <tr><td>&sect;6 BUSI table</td><td>results/busi_v2/, scripts/plot_busi_seeds.py</td><td>python scripts/train.py model=nca_vit_hybrid data=busi model.num_classes=3 training.augmentation.mixup_alpha=0 training.augmentation.cutmix_alpha=0 training.training.class_weighted=true training.training.seed={42,123,7}</td></tr>
+  <tr><td>&sect;6 BUSI table (Claim 5)</td><td>results/busi_v2/, scripts/plot_busi_seeds.py</td><td>python scripts/train.py model=nca_vit_hybrid data=busi model.num_classes=3 training.augmentation.mixup_alpha=0 training.augmentation.cutmix_alpha=0 training.training.class_weighted=true training.training.seed={42,123,7}</td></tr>
+  <tr><td>Claim 6 (SAR/sonar/OCT)</td><td>not separately evaluated &mdash; argued from the speckle/coherent-wave-interference mechanism common to Claim 5's tested ultrasound case</td><td>&mdash; (no reproduce command; see &sect;1 and &sect;6 caveats)</td></tr>
   <tr><td>Architecture (&sect;4, &sect;7)</td><td>src/models/hybrid_nca_vit.py, src/models/nca_attention.py</td><td>&mdash; (source code)</td></tr>
   <tr><td>Full corruption breakdown</td><td>paper.md Appendix C</td><td>python scripts/evaluate_corruptions.py --full</td></tr>
 </table>
