@@ -219,6 +219,61 @@ def main():
         plt.close(fig)
         print(f"Saved: {out_path}")
 
+    # The reverse case, malignant only: DeiT's malignant recall (83-100% across
+    # all 3 seeds) beats Hybrid's (14-64%) -- DeiT achieves this by predicting
+    # "malignant" far more indiscriminately (its benign recall is 2-9% in the
+    # same seeds), but the asymmetry on this one class is real and belongs in
+    # the record, not just the wins. Saved separately, clearly labeled.
+    print("Searching for the reverse case (DeiT right, Hybrid wrong, true=malignant)...")
+    reverse_candidates = []
+    malignant_idx = CLASSES.index("malignant")
+    for i in range(len(val_ds)):
+        img_t, label = val_ds[i]
+        if label != malignant_idx:
+            continue
+        img_t = img_t.unsqueeze(0).to(device)
+        deit_pred, deit_probs = predict(deit, img_t)
+        hybrid_pred, hybrid_probs = predict(hybrid, img_t)
+        if deit_pred == label and hybrid_pred != label:
+            reverse_candidates.append((float(hybrid_probs[hybrid_pred]), i, deit_pred, hybrid_pred))
+
+    if reverse_candidates:
+        reverse_candidates.sort(key=lambda c: -c[0])
+        _, idx, _, _ = reverse_candidates[0]
+        print(f"  {len(reverse_candidates)} candidates; using val#{idx} (Hybrid's most confident miss)")
+        img_t, label = val_ds[idx]
+        raw_img, _ = val_ds_raw[idx]
+        img_t = img_t.unsqueeze(0).to(device)
+        base_rgb = np.array(raw_img.resize((224, 224))) / 255.0
+
+        deit_pred, deit_probs = predict(deit, img_t)
+        hybrid_pred, hybrid_probs = predict(hybrid, img_t)
+        deit_cam = compute_gradcam(deit, MODEL_SPECS["DeiT-Tiny"], img_t, label)
+        hybrid_cam = compute_gradcam(hybrid, MODEL_SPECS["Hybrid NCA-ViT (ours)"], img_t, label)
+
+        fig, axes = plt.subplots(1, 3, figsize=(9.6, 3.4))
+        axes[0].imshow(base_rgb)
+        axes[0].set_title("Input\ntrue: Malignant", fontsize=12)
+        axes[0].set_xticks([]); axes[0].set_yticks([])
+
+        axes[1].imshow(overlay(base_rgb, deit_cam))
+        axes[1].set_title(f"DeiT-Tiny ✓\npred: {CLASSES[deit_pred].title()} ({deit_probs[deit_pred]*100:.0f}%)",
+                           fontsize=12, color="#2a6b2d")
+        axes[1].set_xticks([]); axes[1].set_yticks([])
+
+        axes[2].imshow(overlay(base_rgb, hybrid_cam))
+        axes[2].set_title(f"Hybrid NCA-ViT (ours) ✗\npred: {CLASSES[hybrid_pred].title()} ({hybrid_probs[hybrid_pred]*100:.0f}%)",
+                           fontsize=12, color="#9c3b3b")
+        axes[2].set_xticks([]); axes[2].set_yticks([])
+
+        fig.tight_layout()
+        out_path = os.path.join(args.output_dir, "busi_gradcam_4_malignant_limitation.png")
+        fig.savefig(out_path, dpi=200, bbox_inches="tight")
+        plt.close(fig)
+        print(f"Saved: {out_path}")
+    else:
+        print("  none found at this seed (DeiT recall was 100% on malignant here).")
+
 
 if __name__ == "__main__":
     main()
