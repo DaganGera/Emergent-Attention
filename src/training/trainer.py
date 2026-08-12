@@ -74,11 +74,27 @@ class Trainer:
             num_classes=cfg.model.get("num_classes", 100),
             label_smoothing=train_cfg.label_smoothing,
         )
+        class_weight = None
+        if train_cfg.get("class_weighted", False):
+            if self.mixup_fn is not None:
+                raise ValueError(
+                    "training.training.class_weighted requires Mixup/CutMix disabled "
+                    "(set training.augmentation.mixup_alpha=0 cutmix_alpha=0) -- "
+                    "Mixup produces soft-label targets that per-class CE weighting can't use."
+                )
+            # Reads every label via __getitem__ rather than assuming .targets/.labels,
+            # so it works for any Dataset regardless of internal storage. Fine for the
+            # small, heavily-imbalanced datasets (e.g. BUSI) this exists for.
+            labels = [train_loader.dataset[i][1] for i in range(len(train_loader.dataset))]
+            counts = torch.bincount(torch.tensor(labels)).float()
+            class_weight = (counts.sum() / (len(counts) * counts)).to(device)
+            print(f"[trainer] class_weighted=True -> per-class CE weights {class_weight.tolist()}")
+
         if self.mixup_fn is not None:
             # Mixup already handles label smoothing → plain CE
             self.criterion = nn.CrossEntropyLoss()
         else:
-            self.criterion = nn.CrossEntropyLoss(label_smoothing=train_cfg.label_smoothing)
+            self.criterion = nn.CrossEntropyLoss(weight=class_weight, label_smoothing=train_cfg.label_smoothing)
 
         # AMP
         self.use_amp = train_cfg.amp and device.type == "cuda"

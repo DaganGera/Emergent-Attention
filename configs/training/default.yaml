@@ -22,6 +22,10 @@ training:
   seed: 42
   checkpoint_freq: 10  # save every N epochs
   eval_freq: 1
+  # Inverse-frequency per-class CrossEntropy weighting. Off by default (matches
+  # every existing checkpoint's recipe, CIFAR-100 is balanced so this is a
+  # no-op there anyway); incompatible with Mixup/CutMix, see trainer.py.
+  class_weighted: false
 
 augmentation:
   mixup_alpha: 0.8
