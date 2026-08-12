@@ -1,6 +1,6 @@
 """
-Builds the two camera-ready PDFs (paper + patent disclosure) from the HTML
-templates in this directory.
+Builds the three camera-ready PDFs (paper, patent disclosure, companion
+guide) from the HTML templates in this directory.
 
 Templates use {{IMG:name}} placeholders instead of embedded images, so the
 templates stay small, readable, and diffable in git. This script substitutes
@@ -43,6 +43,14 @@ PATENT_IMAGES = {
     "corruption_robustness": ("corruption_robustness.png", "image/png"),
     "busi_seeds": ("busi_seeds.png", "image/png"),
 }
+COMPANION_IMAGES = {
+    "architecture": ("architecture.png", "image/png"),
+    "corruption_robustness": ("corruption_robustness.png", "image/png"),
+    "noise_drift": ("noise_drift.png", "image/png"),
+    "gradcam_noisy": ("gradcam_noisy.png", "image/png"),
+    "busi_seeds": ("busi_seeds.png", "image/png"),
+    "receptive_field": ("receptive_field_block0.png", "image/png"),
+}
 
 
 def embed_images(template_path: str, images: dict, out_path: str) -> None:
@@ -77,11 +85,14 @@ def main() -> None:
 
     paper_html = os.path.join(tmp_dir, "paper_print_final.html")
     patent_html = os.path.join(tmp_dir, "patent_print_final.html")
+    companion_html = os.path.join(tmp_dir, "companion_print_final.html")
     embed_images(os.path.join(SRC_DIR, "paper_print.html"), PAPER_IMAGES, paper_html)
     embed_images(os.path.join(SRC_DIR, "patent_print.html"), PATENT_IMAGES, patent_html)
+    embed_images(os.path.join(SRC_DIR, "companion_print.html"), COMPANION_IMAGES, companion_html)
 
     render(paper_html, os.path.join(OUT_DIR, "emergent_attention_paper.pdf"), pagedjs_cli)
     render(patent_html, os.path.join(OUT_DIR, "patent_disclosure.pdf"), pagedjs_cli)
+    render(companion_html, os.path.join(OUT_DIR, "emergent_attention_companion.pdf"), pagedjs_cli)
 
 
 if __name__ == "__main__":

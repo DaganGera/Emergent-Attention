@@ -1,0 +1,1706 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Emergent Attention, Explained</title>
+<style>
+  @page {
+    size: letter;
+    margin: 0.9in 1in 0.95in 1in;
+    @top-center { content: element(runhead); }
+    @bottom-center { content: counter(page); font-family: Georgia, "Times New Roman", serif; font-size: 9pt; color: #6b6456; }
+  }
+  @page :first { @top-center { content: none; } }
+  .runhead {
+    position: running(runhead);
+    font-family: "Segoe UI", Calibri, sans-serif; font-size: 8.5pt; letter-spacing: 0.04em; text-transform: uppercase;
+    color: #7a7263; text-align: center; border-bottom: 0.5pt solid #d8d0bd; padding-bottom: 5pt;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 10.3pt;
+    line-height: 1.48;
+    color: #241f14;
+    background: #FBF8F1;
+  }
+  p { margin: 0 0 8pt; text-align: justify; hyphens: auto; orphans: 3; widows: 3; }
+  b, strong { color: #14304F; }
+  i, em { font-style: italic; }
+  a { color: #14304F; text-decoration: none; }
+  code { font-family: Consolas, "Courier New", monospace; font-size: 9pt; background: #F1ECDD; padding: 0 3pt; border-radius: 2pt; }
+
+  /* ---------- Cover ---------- */
+  .cover {
+    min-height: 8.9in; display: flex; flex-direction: column; justify-content: space-between;
+    break-after: page; text-align: center;
+  }
+  .cover-top { margin-top: 0.6in; }
+  .cover-kicker { font-family: "Segoe UI", Calibri, sans-serif; letter-spacing: 0.2em; text-transform: uppercase; font-size: 10pt; color: #C9971F; margin-bottom: 14pt; }
+  .cover-title { font-family: Georgia, serif; font-size: 32pt; font-weight: bold; color: #14304F; line-height: 1.18; margin: 0 auto; max-width: 5.6in; text-wrap: balance; }
+  .cover-sub { font-family: "Segoe UI", Calibri, sans-serif; font-size: 13pt; color: #4a4436; margin-top: 16pt; max-width: 4.9in; margin-left: auto; margin-right: auto; line-height: 1.5; }
+  .cover-mid { display: flex; justify-content: center; gap: 20pt; margin: 0 auto; }
+  .cover-stat { width: 1.7in; border-top: 1.5pt solid #14304F; padding-top: 8pt; }
+  .cover-stat .n { font-size: 18pt; font-weight: bold; color: #14304F; font-family: "Segoe UI", Calibri, sans-serif; }
+  .cover-stat .l { font-size: 8.3pt; color: #6b6456; margin-top: 2pt; font-family: "Segoe UI", Calibri, sans-serif; }
+  .cover-bottom { font-family: "Segoe UI", Calibri, sans-serif; font-size: 9pt; color: #8a8270; margin-bottom: 0.4in; }
+
+  /* ---------- Part title pages ---------- */
+  .part-title { break-before: page; min-height: 8.6in; display: flex; flex-direction: column; justify-content: center; }
+  .part-num { font-family: "Segoe UI", Calibri, sans-serif; letter-spacing: 0.15em; text-transform: uppercase; color: #C9971F; font-size: 11pt; margin-bottom: 10pt; }
+  .part-name { font-size: 26pt; font-weight: bold; color: #14304F; line-height: 1.2; max-width: 5in; text-wrap: balance; }
+  .part-desc { font-size: 11pt; color: #4a4436; margin-top: 16pt; max-width: 4.6in; line-height: 1.55; }
+  .part-chapters { margin-top: 22pt; font-family: "Segoe UI", Calibri, sans-serif; font-size: 9.3pt; color: #6b6456; }
+  .part-chapters div { padding: 3pt 0; border-bottom: 0.5pt solid #e5ddc8; max-width: 4.6in; }
+
+  /* ---------- Headings ---------- */
+  h1.chapter {
+    font-size: 17pt; font-weight: bold; color: #14304F; margin: 4pt 0 3pt; break-before: page; break-after: avoid;
+    padding-top: 0.1in;
+  }
+  .chap-eyebrow { font-family: "Segoe UI", Calibri, sans-serif; letter-spacing: 0.12em; text-transform: uppercase; font-size: 8.3pt; color: #C9971F; margin-bottom: 4pt; }
+  h2 { font-size: 12.5pt; font-weight: bold; color: #14304F; margin: 15pt 0 6pt; break-after: avoid; }
+  h3 { font-size: 10.8pt; font-weight: bold; font-style: italic; color: #3a3524; margin: 11pt 0 5pt; break-after: avoid; }
+
+  /* ---------- Callout boxes ---------- */
+  .box { border-radius: 3pt; padding: 8pt 11pt; margin: 10pt 0; break-inside: avoid; font-size: 9.6pt; }
+  .box .box-lbl { font-family: "Segoe UI", Calibri, sans-serif; font-weight: bold; font-size: 8pt; letter-spacing: 0.09em; text-transform: uppercase; margin-bottom: 4pt; display: block; }
+  .box p:last-child { margin-bottom: 0; }
+  .box p { text-align: left; }
+
+  .intuition { background: #EAF2FB; border-left: 3pt solid #2E6FBA; }
+  .intuition .box-lbl { color: #1E5490; }
+
+  .worked { background: #FDF3DE; border-left: 3pt solid #C9971F; }
+  .worked .box-lbl { color: #9C7412; }
+  .worked table { width: 100%; border-collapse: collapse; margin: 6pt 0; font-family: Consolas, monospace; font-size: 8.9pt; }
+  .worked table td, .worked table th { padding: 2.5pt 6pt; text-align: right; border-bottom: 0.5pt solid #e8d8a8; }
+  .worked table th { text-align: right; font-weight: bold; font-family: "Segoe UI", Calibri, sans-serif; font-size: 8.3pt; }
+  .worked table td:first-child, .worked table th:first-child { text-align: left; }
+
+  .insight { background: #E9F5EC; border-left: 3pt solid #3F9142; }
+  .insight .box-lbl { color: #2A6B2D; }
+
+  .pitfall { background: #FCEAEA; border-left: 3pt solid #C1443C; }
+  .pitfall .box-lbl { color: #9A2E28; }
+
+  .defn { background: #F1EFE6; border-left: 3pt solid #8A836D; }
+  .defn .box-lbl { color: #5c5644; }
+
+  /* ---------- Formulas & kernels (reused pattern) ---------- */
+  .formula {
+    text-align: center; font-family: "Cambria Math", Cambria, Georgia, serif; font-style: italic;
+    font-size: 11pt; margin: 10pt 0; break-inside: avoid; color: #14304F;
+  }
+  .formula .op { font-style: normal; padding: 0 5pt; color: #241f14; }
+  .formula sub, .formula sup { font-size: 66%; }
+  .formula .lbl2 { display: block; font-family: "Segoe UI", Calibri, sans-serif; font-style: normal; font-size: 8pt; color: #7a7263; margin-top: 4pt; }
+
+  .kernels { display: flex; justify-content: center; gap: 22pt; margin: 9pt 0; break-inside: avoid; }
+  .kernel table { border-collapse: collapse; margin: 0 auto; }
+  .kernel td { width: 22pt; height: 16pt; text-align: center; font-size: 8.5pt; border: 0.5pt solid #b9b096; font-family: "Cambria Math", serif; background: #fff; }
+  .kernel .kname { text-align: center; font-size: 8pt; margin-top: 3pt; font-family: "Segoe UI", Calibri, sans-serif; color: #6b6456; }
+
+  .pixgrid { display: flex; justify-content: center; gap: 30pt; margin: 9pt 0; align-items: center; flex-wrap: wrap; }
+  .pixgrid table { border-collapse: collapse; }
+  .pixgrid td { width: 26pt; height: 20pt; text-align: center; font-size: 9pt; border: 0.5pt solid #b9b096; font-family: Consolas, monospace; background: #fff; }
+  .pixgrid td.hl { background: #FDF3DE; font-weight: bold; }
+  .pixgrid .glabel { text-align: center; font-size: 8pt; margin-top: 4pt; font-family: "Segoe UI", Calibri, sans-serif; color: #6b6456; }
+
+  /* ---------- Tables ---------- */
+  table.datatable { border-collapse: collapse; margin: 8pt auto; font-size: 8.9pt; width: 100%; break-inside: avoid; }
+  table.datatable caption { caption-side: top; text-align: left; font-size: 9pt; margin-bottom: 5pt; font-family: "Segoe UI", Calibri, sans-serif; color: #4a4436; }
+  table.datatable caption b { color: #14304F; }
+  table.datatable th, table.datatable td { padding: 3.5pt 8pt; text-align: right; }
+  table.datatable td:first-child, table.datatable th:first-child { text-align: left; }
+  table.datatable thead tr { border-top: 1pt solid #14304F; border-bottom: 0.6pt solid #14304F; }
+  table.datatable thead th { font-weight: bold; padding-bottom: 4pt; font-family: "Segoe UI", Calibri, sans-serif; font-size: 8.3pt; color: #14304F; }
+  table.datatable tbody tr:last-child { border-bottom: 1pt solid #14304F; }
+  table.datatable tr.hl td { font-weight: bold; color: #14304F; }
+
+  /* ---------- Figures ---------- */
+  figure { margin: 12pt 0; break-inside: avoid; text-align: center; }
+  figure img { max-width: 100%; display: block; margin: 0 auto; border: 0.5pt solid #d8d0bd; }
+  figcaption { font-size: 8.7pt; text-align: left; margin-top: 6pt; line-height: 1.4; color: #4a4436; font-family: "Segoe UI", Calibri, sans-serif; }
+  figcaption b { color: #14304F; }
+
+  /* ---------- Misc ---------- */
+  ul, ol { margin: 6pt 0 8pt; padding-left: 17pt; }
+  li { margin-bottom: 4pt; }
+  .glossary dt { font-weight: bold; color: #14304F; margin-top: 8pt; font-family: "Segoe UI", Calibri, sans-serif; font-size: 9.6pt; }
+  .glossary dd { margin: 2pt 0 0; font-size: 9.6pt; }
+  .toc a { color: #241f14; }
+  .toc-part { font-weight: bold; color: #14304F; margin-top: 10pt; font-family: "Segoe UI", Calibri, sans-serif; font-size: 10pt; }
+  .toc-chap { display: flex; justify-content: space-between; font-size: 9.6pt; padding: 1.5pt 0 1.5pt 12pt; border-bottom: 0.4pt dotted #cfc6ac; }
+  .checkpoint { background: #F1EFE6; border: 0.5pt solid #d8d0bd; border-radius: 3pt; padding: 8pt 11pt; margin: 12pt 0; break-inside: avoid; }
+  .checkpoint .box-lbl { font-family: "Segoe UI", Calibri, sans-serif; font-weight: bold; font-size: 8pt; letter-spacing: 0.09em; text-transform: uppercase; color: #14304F; display: block; margin-bottom: 4pt; }
+  .checkpoint ul { margin: 4pt 0 0; font-size: 9.4pt; }
+</style>
+</head>
+<body>
+
+<div class="runhead">Emergent Attention, Explained &mdash; A First-Principles Guide</div>
+
+<div class="cover">
+  <div class="cover-top">
+    <div class="cover-kicker">A Companion Guide</div>
+    <div class="cover-title">Emergent Attention, Explained</div>
+    <div class="cover-sub">Every idea in this project, built up from first principles &mdash; the math, the mechanism, and every experiment, in plain language first and precise language second.</div>
+  </div>
+  <div class="cover-mid">
+    <div class="cover-stat"><div class="n">0&nbsp;&rarr;&nbsp;1</div><div class="l">ASSUMES NOTHING,<br>BUILDS EVERYTHING</div></div>
+    <div class="cover-stat"><div class="n">43</div><div class="l">SHORT CHAPTERS,<br>9 PARTS</div></div>
+    <div class="cover-stat"><div class="n">20+</div><div class="l">WORKED NUMERIC<br>EXAMPLES</div></div>
+  </div>
+  <div class="cover-bottom">Companion to <i>Emergent Attention: Iterated Local Neural Cellular Automata as a Noise-Robust Token Mixer for Vision Transformers</i></div>
+</div>
+
+<div class="part-title" style="break-before: auto;">
+  <div class="part-num">Before You Start</div>
+  <div class="part-name">How This Book Works</div>
+  <div class="part-desc">
+    <p style="text-align:left;">This is the companion to the research paper and the patent disclosure. Those two documents are written for reviewers and a patent agent &mdash; dense, terse, assuming a reader who already knows the field. This one assumes <b>nothing</b>. If a topic needs prior knowledge to understand, that knowledge gets its own chapter, built from the ground up, before it is used.</p>
+  </div>
+</div>
+
+<h2 style="margin-top:0;">What you are about to read</h2>
+<p>You built (or are building, alongside your mentor) a Vision Transformer that replaces its attention mechanism with something borrowed from an unrelated corner of computer science &mdash; Cellular Automata &mdash; and found that the result is not just competitive, it is specifically <i>more robust to certain kinds of image noise</i>, for a reason you can explain and verify. This book's job is to make sure you can explain every step of that sentence, from the ground up, to anyone: a mentor, a patent examiner, a conference audience, or yourself in a year.</p>
+
+<div class="box intuition">
+  <span class="box-lbl">How each idea is introduced</span>
+  <p>Every new concept in this book follows the same three-step pattern: <b>(1)</b> a plain-English intuition with no symbols at all, <b>(2)</b> the precise mathematical definition, and <b>(3)</b> a <b>worked numeric example</b> &mdash; small, made-up numbers you could reproduce by hand or on a calculator, so the formula stops being an abstract shape and becomes an arithmetic procedure you have personally executed at least once.</p>
+</div>
+
+<p>Four kinds of colored boxes appear throughout. Recognizing them at a glance is the whole point of using color:</p>
+<div class="box intuition"><span class="box-lbl">Intuition</span><p>The plain-English version of an idea, with no formulas. Read this first if a section feels dense.</p></div>
+<div class="box worked"><span class="box-lbl">Worked Example</span><p>Small, concrete numbers, computed step by step. These are invented for teaching &mdash; not the project's real trained weights &mdash; unless explicitly labeled as real project numbers.</p></div>
+<div class="box insight"><span class="box-lbl">Key Insight</span><p>The one sentence that matters most in a section &mdash; what you'd want to remember six months from now.</p></div>
+<div class="box pitfall"><span class="box-lbl">Pitfall</span><p>A mistake that was actually made during this project, and how it was caught. These are included on purpose: knowing what went wrong, and how you'd notice, is part of understanding the result.</p></div>
+
+<h2>The roadmap</h2>
+<p>The book has nine parts. Parts I&ndash;V build every piece of mathematical and conceptual machinery the project depends on &mdash; vectors and matrices, how a neural network learns anything at all, how convolution filters see edges, how attention lets a token look at every other token, and how a Cellular Automaton turns a tiny local rule into complex global behavior. None of these five parts are specific to this project; they are the standard toolkit of modern deep learning, taught the way you'd want a first course to teach them.</p>
+<p>Part VI is where the project's actual contribution lives: <b>Emergent Attention</b>, the mechanism that replaces attention with iterated local NCA updates. By the time you reach it, every piece it's built from has already been explained, so the chapter can focus entirely on what's new and why each design choice was made. Part VII covers the specific networks that were built and trained. Part VIII walks through every experiment that was run, in the order it was run, including the two places a mistake was found mid-project and fixed &mdash; told as case studies, because noticing your own error before a reviewer does is a skill, not an accident. Part IX steps back: what's actually new here, what the honest limitations are, and what "patentable" means in plain English.</p>
+
+<div class="part-chapters">
+  <div class="toc-part" style="margin-top:0;">Part I &mdash; Mathematical Toolkit</div>
+  <div class="toc-chap"><span>1. Numbers as Vectors, Images as Grids of Numbers</span></div>
+  <div class="toc-chap"><span>2. Matrices and Matrix Multiplication</span></div>
+  <div class="toc-chap"><span>3. Slopes, Derivatives, and Gradients</span></div>
+  <div class="toc-chap"><span>4. Probability in Brief: Random Variables, Bernoulli, Expectation</span></div>
+  <div class="toc-chap"><span>5. Big-O Notation: Talking About "How Much Work"</span></div>
+  <div class="toc-part">Part II &mdash; How a Neural Network Learns</div>
+  <div class="toc-chap"><span>6. The Single Neuron</span></div>
+  <div class="toc-chap"><span>7. Activation Functions: ReLU and Softmax</span></div>
+  <div class="toc-chap"><span>8. Measuring Wrongness: Loss and Cross-Entropy</span></div>
+  <div class="toc-chap"><span>9. Gradient Descent and Backpropagation</span></div>
+  <div class="toc-chap"><span>10. The Full Training Recipe</span></div>
+  <div class="toc-part">Part III &mdash; Seeing Like a Convolution</div>
+  <div class="toc-chap"><span>11. Convolution: Sliding a Small Window Over an Image</span></div>
+  <div class="toc-chap"><span>12. Edge Detection: The Sobel Filters</span></div>
+  <div class="toc-chap"><span>13. Receptive Fields: How Far Can One Cell See?</span></div>
+  <div class="toc-part">Part IV &mdash; Attention and the Vision Transformer</div>
+  <div class="toc-chap"><span>14. Turning an Image into Tokens</span></div>
+  <div class="toc-chap"><span>15. Self-Attention: Query, Key, Value</span></div>
+  <div class="toc-chap"><span>16. Multi-Head Attention and the Transformer Block</span></div>
+  <div class="toc-chap"><span>17. The Cost of Attention, and Why It Matters</span></div>
+  <div class="toc-chap"><span>18. The Baselines: ViT, DeiT, Swin</span></div>
+  <div class="toc-part">Part V &mdash; Cellular Automata</div>
+  <div class="toc-chap"><span>19. Conway's Game of Life: Complexity from a Local Rule</span></div>
+  <div class="toc-chap"><span>20. Neural Cellular Automata: Learning the Local Rule</span></div>
+  <div class="toc-chap"><span>21. Why Iteration Can Substitute for Global Attention</span></div>
+  <div class="toc-part">Part VI &mdash; Emergent Attention: This Project's Method</div>
+  <div class="toc-chap"><span>22. The Idea, in One Paragraph</span></div>
+  <div class="toc-chap"><span>23. The Full Mechanism, Worked Numerically</span></div>
+  <div class="toc-chap"><span>24. Four Design Decisions, and Why Each Was Made</span></div>
+  <div class="toc-chap"><span>25. Complexity, With Real Project Numbers</span></div>
+  <div class="toc-part">Part VII &mdash; The Architectures Built</div>
+  <div class="toc-chap"><span>26. Hybrid NCA-ViT</span></div>
+  <div class="toc-chap"><span>27. Pure NCA-ViT and the Other Baselines</span></div>
+  <div class="toc-chap"><span>28. Counting Parameters, Worked Example</span></div>
+  <div class="toc-part">Part VIII &mdash; The Experiments, One by One</div>
+  <div class="toc-chap"><span>29. CIFAR-100 and "Top-1 Accuracy"</span></div>
+  <div class="toc-chap"><span>30. Reading the Main Results Table</span></div>
+  <div class="toc-chap"><span>31. Ablation: The Depth-Ordering Experiment</span></div>
+  <div class="toc-chap"><span>32. Adversarial Robustness: FGSM and PGD</span></div>
+  <div class="toc-chap"><span>33. Corruption Robustness: CIFAR-100-C</span></div>
+  <div class="toc-chap"><span>34. Mechanism Verification: Representation Drift</span></div>
+  <div class="toc-chap"><span>35. Case Study &mdash; the Bug in the Drift Measurement</span></div>
+  <div class="toc-chap"><span>36. Grad-CAM: Seeing What the Network Looks At</span></div>
+  <div class="toc-chap"><span>37. Real-World Validation: BUSI Breast Ultrasound</span></div>
+  <div class="toc-chap"><span>38. Emergent Receptive Field, Measured</span></div>
+  <div class="toc-part">Part IX &mdash; Putting It Together</div>
+  <div class="toc-chap"><span>39. What Is Actually New Here</span></div>
+  <div class="toc-chap"><span>40. Honest Limitations</span></div>
+  <div class="toc-chap"><span>41. From Research to Patent, in Plain English</span></div>
+  <div class="toc-chap"><span>42. Glossary</span></div>
+  <div class="toc-chap"><span>43. Where to Find Everything</span></div>
+</div>
+
+<div class="part-title">
+  <div class="part-num">Part I</div>
+  <div class="part-name">Mathematical Toolkit</div>
+  <div class="part-desc"><p style="text-align:left;">Five short chapters covering everything the rest of the book leans on: vectors, matrices, derivatives, probability, and a way of talking about "how much computational work" without getting lost in constants. None of this is specific to the project &mdash; it's the standard first-year vocabulary of applied math that every later chapter will use without re-explaining.</p></div>
+  <div class="part-chapters">
+    <div>1. Numbers as Vectors, Images as Grids of Numbers</div>
+    <div>2. Matrices and Matrix Multiplication</div>
+    <div>3. Slopes, Derivatives, and Gradients</div>
+    <div>4. Probability in Brief: Random Variables, Bernoulli, Expectation</div>
+    <div>5. Big-O Notation: Talking About "How Much Work"</div>
+  </div>
+</div>
+
+<div class="chap-eyebrow">Chapter 1 &middot; Part I</div>
+<h1 class="chapter">Numbers as Vectors, Images as Grids of Numbers</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>A <b>vector</b> is nothing more than an ordered list of numbers. "3 kilometers east, 4 kilometers north" is a vector: two numbers, in a fixed order, describing one thing (a position). A single pixel's color, "red=200, green=40, blue=40," is also a vector &mdash; three numbers, in a fixed order, describing one thing (a color). Everything a neural network computes with &mdash; an image, a word, a hidden layer's output &mdash; is stored as a vector or a grid of vectors. There is no deeper trick here: "the network's internal representation" always just means "a list of numbers."</p>
+</div>
+
+<p>Formally, a vector of length <i>D</i> is written <b>v</b> &isin; &#8477;<sup>D</sup>, meaning an ordered tuple of <i>D</i> real numbers, <i>v</i> = (<i>v</i><sub>1</sub>, <i>v</i><sub>2</sub>, &hellip;, <i>v<sub>D</sub></i>). <i>D</i> is called the vector's <b>dimension</b>. In this project, every image patch is eventually represented as a vector of dimension <i>D</i>&nbsp;=&nbsp;192 &mdash; not because 192 is special, but because it's the width the network's designer chose for its internal "channel" dimension (Appendix&nbsp;A of the paper).</p>
+
+<h2>The dot product</h2>
+<p>The single most common operation on two vectors of the same length is the <b>dot product</b>: multiply each pair of matching entries, then add up all the products.</p>
+<div class="formula">a &middot; b = a<sub>1</sub>b<sub>1</sub> + a<sub>2</sub>b<sub>2</sub> + &hellip; + a<sub>D</sub>b<sub>D</sub> = &Sigma;<sub>i</sub> a<sub>i</sub>b<sub>i</sub></div>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; dot product</span>
+  <p>Let <b>a</b> = (2, 0, &minus;1) and <b>b</b> = (3, 4, 5).</p>
+  <table><tr><th>term</th><th>a<sub>i</sub></th><th>b<sub>i</sub></th><th>a<sub>i</sub>&middot;b<sub>i</sub></th></tr>
+  <tr><td>i=1</td><td>2</td><td>3</td><td>6</td></tr>
+  <tr><td>i=2</td><td>0</td><td>4</td><td>0</td></tr>
+  <tr><td>i=3</td><td>&minus;1</td><td>5</td><td>&minus;5</td></tr></table>
+  <p><b>a</b> &middot; <b>b</b> = 6 + 0 &minus; 5 = <b>1</b>. That's the whole procedure &mdash; multiply pairwise, then sum. You will see this exact operation dozens of times later: it's the arithmetic core of attention (Chapter 15), of every "Linear" layer (Chapter 2), and of measuring how similar two feature vectors are (Chapter 34).</p>
+</div>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight</span>
+  <p>A dot product is a single number that measures how much two vectors "point the same way." Two vectors pointing in similar directions produce a large positive dot product; opposite directions produce a large negative one; unrelated (perpendicular) directions produce something close to zero. This one fact is the entire basis of the attention mechanism in Chapter 15 and the drift metric in Chapter 34.</p>
+</div>
+
+<h2>Images as grids of vectors</h2>
+<p>A grayscale image is a 2-D grid of numbers &mdash; one brightness value per pixel. A color image adds a third axis for the red/green/blue channels, so it's stored as a <b>tensor</b> (a multi-dimensional grid of numbers) of shape <i>H</i>&times;<i>W</i>&times;<i>C</i>: height, width, and channel count (<i>C</i>=3 for RGB).</p>
+
+<div class="pixgrid">
+  <div>
+    <table>
+      <tr><td>210</td><td>180</td></tr>
+      <tr><td>30</td><td>250</td></tr>
+    </table>
+    <div class="glabel">a 2&times;2 grayscale image<br>(shape 2&times;2&times;1)</div>
+  </div>
+</div>
+
+<p>This project works at 224&times;224 pixels with 3 color channels &mdash; a tensor with 224&times;224&times;3 = 150,528 individual numbers per image. No network processes that many individual numbers as one flat list; instead the image is cut into small square <b>patches</b> (16&times;16 pixels each, giving a 14&times;14 grid of patches &mdash; 196 patches total, since 224&divide;16=14), and each patch is converted into a single <i>D</i>=192-dimensional vector. Chapter 14 covers exactly how that conversion happens; for now, the important fact is just: <b>an image becomes a grid of vectors, one vector per patch</b>, and everything downstream operates on that grid.</p>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight</span>
+  <p>Two numbers you will see constantly from here on: <b><i>n</i> = 196</b> (the number of patches / tokens per image) and <b><i>D</i> = 192</b> (the length of the vector describing each patch). Every formula in Chapter 15 onward that mentions "the cost is <i>O</i>(<i>n</i><sup>2</sup><i>D</i>)" is really just talking about combinations of these two numbers.</p>
+</div>
+
+<div class="chap-eyebrow">Chapter 2 &middot; Part I</div>
+<h1 class="chapter">Matrices and Matrix Multiplication</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>A <b>matrix</b> is a rectangular table of numbers &mdash; rows and columns. If a vector is one list of numbers, a matrix is a list of lists. The single most important thing a matrix does in this entire project is act as a "recipe" for turning one vector into another vector, usually of a different length &mdash; that recipe is called a <b>linear layer</b>, and it is the single most common building block in every network described in this book.</p>
+</div>
+
+<p>A matrix with <i>R</i> rows and <i>C</i> columns is written <i>W</i> &isin; &#8477;<sup><i>R</i>&times;<i>C</i></sup>. Multiplying a matrix by a vector, <i>y</i> = <i>Wx</i>, produces a new vector <i>y</i> whose <i>i</i>-th entry is the dot product of <i>W</i>'s <i>i</i>-th row with <i>x</i>:</p>
+<div class="formula">y<sub>i</sub> = &Sigma;<sub>j</sub> W<sub>ij</sub> x<sub>j</sub></div>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; a linear layer by hand</span>
+  <p>Take a tiny "linear layer" that turns a 2-dimensional input into a 3-dimensional output: <i>x</i> = (1, 2), and a weight matrix</p>
+  <table><tr><th></th><th>col 1</th><th>col 2</th></tr>
+  <tr><td>row 1</td><td>2</td><td>0</td></tr>
+  <tr><td>row 2</td><td>1</td><td>1</td></tr>
+  <tr><td>row 3</td><td>&minus;1</td><td>3</td></tr></table>
+  <p>Row 1 &middot; <i>x</i> = 2&times;1 + 0&times;2 = 2. Row 2 &middot; <i>x</i> = 1&times;1 + 1&times;2 = 3. Row 3 &middot; <i>x</i> = &minus;1&times;1 + 3&times;2 = 5. So <i>y</i> = <i>Wx</i> = (2, 3, 5). A 2-dimensional vector became a 3-dimensional vector, using nothing but nine numbers (the matrix) and repeated dot products.</p>
+  <p>Real layers add one more piece, a <b>bias</b> vector <i>b</i>, so the full operation is <i>y</i> = <i>Wx</i> + <i>b</i>. If <i>b</i> = (0.5, 0.5, 0.5) here, <i>y</i> becomes (2.5, 3.5, 5.5).</p>
+</div>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight</span>
+  <p>Every time this book (or the paper) says "Linear," "projection," "<i>W</i><sub>1</sub>&middot;perc + <i>b</i><sub>1</sub>," or draws an arrow labeled with a weight matrix, it means exactly the procedure above: multiply, sum, add a bias. A model's "weights" &mdash; the things training actually changes &mdash; are just the numbers inside these matrices (and a handful of biases). "Training a 6.46-million-parameter model" literally means: there are 6.46 million individual numbers, spread across many such matrices, and training is the process of adjusting all of them.</p>
+</div>
+
+<p>Matrices can also multiply each other, not just a vector: if <i>A</i> is <i>R</i>&times;<i>K</i> and <i>B</i> is <i>K</i>&times;<i>C</i>, their product <i>AB</i> is <i>R</i>&times;<i>C</i>, computed by taking the dot product of each row of <i>A</i> with each column of <i>B</i>. This is exactly how a whole <i>batch</i> of vectors gets processed at once &mdash; stack many input vectors as rows of a matrix, multiply by the weight matrix once, and every row of the output is that row's transformed vector. This is why GPUs are fast for neural networks: matrix multiplication is one operation that processes thousands of vectors in parallel.</p>
+
+<div class="chap-eyebrow">Chapter 3 &middot; Part I</div>
+<h1 class="chapter">Slopes, Derivatives, and Gradients</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>A <b>derivative</b> answers one question: "if I nudge this number up slightly, does the output go up or down, and by roughly how much?" That's it &mdash; a derivative is a slope. Training a neural network is, at its core, nothing but repeatedly asking this question for every one of its millions of weights and nudging each one in the direction that makes the network's error go down.</p>
+</div>
+
+<p>For a function <i>f</i>(<i>x</i>), the derivative at a point <i>x</i> is written <i>f</i>&prime;(<i>x</i>) or <i>df</i>/<i>dx</i>, and it is the slope of the curve at that exact point &mdash; formally, the limit of (<i>f</i>(<i>x</i>+<i>h</i>) &minus; <i>f</i>(<i>x</i>)) / <i>h</i> as the step size <i>h</i> shrinks to zero. You do not need the limit machinery for this book; you need the handful of rules it produces and the ability to read what a derivative is telling you.</p>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; the slope of <i>f</i>(<i>x</i>) = <i>x</i><sup>2</sup></span>
+  <p>The rule for this shape is <i>f</i>&prime;(<i>x</i>) = 2<i>x</i>. At <i>x</i>=3: <i>f</i>(3)=9 and <i>f</i>&prime;(3)=6, meaning near <i>x</i>=3, nudging <i>x</i> up by a small amount increases <i>f</i> at roughly 6&times; that rate. Check it directly: <i>f</i>(3.1) = 9.61, and 9 + 6&times;0.1 = 9.6 &mdash; matches almost exactly. At <i>x</i>=0, the slope is 2&times;0=0: the bottom of the bowl is flat, which is exactly where you'd stop if you were rolling downhill &mdash; the idea Chapter 9 turns into an actual training algorithm.</p>
+</div>
+
+<h2>Many variables at once: the gradient</h2>
+<p>A neural network's error is not a function of one number, it's a function of every one of its millions of weights simultaneously. The generalization of "slope" to many variables is the <b>gradient</b>: a vector containing the partial derivative with respect to each variable separately (holding all the others fixed). Written &nabla;<i>f</i>, it points in the direction that increases <i>f</i> the fastest.</p>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; a gradient in two variables</span>
+  <p>Let <i>f</i>(<i>w</i><sub>1</sub>, <i>w</i><sub>2</sub>) = <i>w</i><sub>1</sub><sup>2</sup> + <i>w</i><sub>2</sub><sup>2</sup>. Treating <i>w</i><sub>2</sub> as a constant, &part;<i>f</i>/&part;<i>w</i><sub>1</sub> = 2<i>w</i><sub>1</sub>; symmetrically &part;<i>f</i>/&part;<i>w</i><sub>2</sub> = 2<i>w</i><sub>2</sub>. At (<i>w</i><sub>1</sub>,<i>w</i><sub>2</sub>) = (1, 2): the gradient is &nabla;<i>f</i> = (2, 4). This says: at this point, increasing <i>w</i><sub>2</sub> moves <i>f</i> upward twice as fast as increasing <i>w</i><sub>1</sub> does &mdash; so if you wanted to <i>decrease f</i> as fast as possible, you'd step in the opposite direction, (&minus;2, &minus;4), moving <i>w</i><sub>2</sub> twice as far as <i>w</i><sub>1</sub>. This is exactly what gradient descent (Chapter 9) does, at the scale of millions of weights instead of two.</p>
+</div>
+
+<h2>The chain rule</h2>
+<p>Neural networks are functions built by composing many simpler functions in sequence (layer after layer). The <b>chain rule</b> says the derivative of a composition is the product of the pieces' derivatives:</p>
+<div class="formula">if y = f(g(x)), then dy/dx = f&prime;(g(x)) &middot; g&prime;(x)</div>
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; chain rule</span>
+  <p>Let <i>y</i> = (3<i>x</i>+1)<sup>2</sup>. Write it as <i>g</i>(<i>x</i>)=3<i>x</i>+1 (so <i>g</i>&prime;(<i>x</i>)=3) composed with <i>f</i>(<i>u</i>)=<i>u</i><sup>2</sup> (so <i>f</i>&prime;(<i>u</i>)=2<i>u</i>). At <i>x</i>=1: <i>g</i>(1)=4, so <i>dy/dx</i> = <i>f</i>&prime;(4)&middot;3 = 8&times;3 = <b>24</b>. Check directly: <i>y</i>(1)=16, <i>y</i>(1.01)=(4.03)<sup>2</sup>=16.24, a change of 0.24 for a 0.01 step &mdash; 24&times;, matching.</p>
+</div>
+<div class="box insight">
+  <span class="box-lbl">Key Insight</span>
+  <p><b>Backpropagation</b> (Chapter 9) is nothing more than applying the chain rule automatically, layer by layer, from the network's output error backward to every single weight. There is no separate "backprop math" beyond this rule applied a few dozen times in a row, once per layer.</p>
+</div>
+
+<div class="chap-eyebrow">Chapter 4 &middot; Part I</div>
+<h1 class="chapter">Probability in Brief: Random Variables, Bernoulli, Expectation</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>A <b>random variable</b> is just a quantity whose value isn't fixed &mdash; it's drawn according to some rule each time you "run" it. A coin flip is the simplest possible random variable: it comes out heads or tails, with some probability attached to each. This project uses exactly this idea, deliberately, inside its core mechanism: each of the network's internal "cells" flips a biased coin at every update step to decide whether it's allowed to update at all (Chapter 23).</p>
+</div>
+
+<h2>The Bernoulli distribution</h2>
+<p>A <b>Bernoulli</b> random variable takes only two values, 1 ("success") or 0 ("failure"), with <i>P</i>(1) = <i>p</i> and <i>P</i>(0) = 1&minus;<i>p</i>, for some fixed probability <i>p</i> between 0 and 1. Written <i>m</i> &sim; Bernoulli(<i>p</i>).</p>
+<p>The <b>expectation</b> (average value, over infinitely many repeats) of a random variable is written <i>E</i>[&middot;]. For a Bernoulli variable, <i>E</i>[<i>m</i>] = 1&times;<i>p</i> + 0&times;(1&minus;<i>p</i>) = <i>p</i>.</p>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; Bernoulli(0.5)</span>
+  <p>This is a fair-coin flip: <i>p</i>=0.5. Flip it 10 times, and you'd expect about 5 ones and 5 zeros &mdash; not exactly 5 every time (that's the "random" part), but 5 is the long-run average: <i>E</i>[<i>m</i>] = 0.5. Now suppose <i>m</i> is used as a gate on some value &delta;: the update rule is "add &delta; to the state only if <i>m</i>=1." Over many repeats, roughly half the updates get applied and half get skipped, at whichever locations independently drew a 1.</p>
+</div>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight</span>
+  <p>In this project, every one of the 196 patch positions independently draws its own Bernoulli(0.5) coin flip at every one of the mechanism's internal iterations, deciding whether that specific location's proposed update gets applied this step. Some cells update, some sit still, and which ones do is different every time, even for the same image. Chapter 20 explains why NCA research adopted this on purpose &mdash; it is not noise added by accident, it is a stability technique borrowed directly from prior Cellular Automata work.</p>
+</div>
+
+<div class="chap-eyebrow">Chapter 5 &middot; Part I</div>
+<h1 class="chapter">Big-O Notation: Talking About "How Much Work"</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>If you double the size of an image, how much more computation does processing it take? Twice as much? Four times? A hundred times? <b>Big-O notation</b> is a shorthand for answering exactly this question &mdash; not with an exact number (which depends on hardware, implementation, etc.) but with the <i>shape</i> of the growth curve as the input gets large. It ignores constant multipliers and focuses on which variable the cost scales with, and how.</p>
+</div>
+
+<p><i>O</i>(<i>n</i>) means "cost grows proportionally to <i>n</i>" &mdash; doubling <i>n</i> roughly doubles the cost. <i>O</i>(<i>n</i><sup>2</sup>) means "cost grows proportionally to <i>n</i> squared" &mdash; doubling <i>n</i> roughly quadruples the cost. The difference between these two shapes is the single most important fact in Part IV of this book.</p>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; O(n) vs. O(n<sup>2</sup>) at this project's actual token count</span>
+  <p>This project's images are cut into <i>n</i> = 196 patch tokens (Chapter 1). Compare the two growth shapes at this exact value:</p>
+  <table><tr><th>Quantity</th><th>Formula</th><th>Value at n=196</th></tr>
+  <tr><td>Linear cost</td><td>O(n)</td><td>196</td></tr>
+  <tr><td>Quadratic cost</td><td>O(n<sup>2</sup>)</td><td>38,416</td></tr></table>
+  <p>The quadratic quantity is <b>196&times; larger</b> than the linear one, at this exact, real token count &mdash; not a hypothetical large <i>n</i>, the actual number of patches in every single image this project processes. Standard self-attention (Chapter 15) costs <i>O</i>(<i>n</i><sup>2</sup><i>D</i>): every one of the 196 tokens compares itself against all 196 others. Emergent Attention (Chapter 23) costs <i>O</i>(<i>Kn</i><sup>&nbsp;</sup><i>D</i><sup>2</sup>): every token only ever looks at its 8 immediate neighbors, repeated <i>K</i> times &mdash; linear in <i>n</i>, not quadratic. Chapter 25 returns to this exact comparison with the project's real <i>D</i> and <i>K</i> values filled in.</p>
+</div>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight</span>
+  <p>"Linear in <i>n</i> instead of quadratic in <i>n</i>" is not a minor implementation detail &mdash; it is the entire computational argument for why iterated local computation (Cellular Automata) is even worth considering as a substitute for global attention. Whether that theoretical advantage shows up as an actual speed advantage in this project's measured throughput is a separate, honestly-reported question, addressed in Chapter 25.</p>
+</div>
+
+<div class="part-title">
+  <div class="part-num">Part II</div>
+  <div class="part-name">How a Neural Network Learns</div>
+  <div class="part-desc"><p style="text-align:left;">Five chapters from a single artificial neuron to the full training recipe used to produce every number in this project. By the end of this part, sentences like "AdamW, lr=5&times;10<sup>&minus;4</sup>, cosine schedule with 10-epoch warmup, label smoothing 0.1, EMA decay 0.9999" &mdash; the actual line from the paper's experimental setup &mdash; will read as a list of specific, understood choices, not jargon.</p></div>
+  <div class="part-chapters">
+    <div>6. The Single Neuron</div>
+    <div>7. Activation Functions: ReLU and Softmax</div>
+    <div>8. Measuring Wrongness: Loss and Cross-Entropy</div>
+    <div>9. Gradient Descent and Backpropagation</div>
+    <div>10. The Full Training Recipe</div>
+  </div>
+</div>
+
+<div class="chap-eyebrow">Chapter 6 &middot; Part II</div>
+<h1 class="chapter">The Single Neuron</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>An artificial "neuron" does one small thing: it takes several numbers in, multiplies each by its own importance weight, adds them up, adds one more adjustable number (a bias), and passes the result through a simple nonlinear function. That's the entire unit. A neural network is thousands to billions of these, wired together in layers.</p>
+</div>
+
+<div class="formula">output = activation( w<sub>1</sub>x<sub>1</sub> + w<sub>2</sub>x<sub>2</sub> + &hellip; + w<sub>D</sub>x<sub>D</sub> + b ) = activation( w &middot; x + b )</div>
+<p>Notice the middle term is exactly the dot product plus bias from Chapter 2 &mdash; a single neuron <i>is</i> a 1-row linear layer, followed by an activation function (Chapter 7).</p>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; one neuron, three inputs</span>
+  <p>Inputs <i>x</i> = (1, 2, &minus;1), weights <i>w</i> = (0.5, &minus;1, 2), bias <i>b</i> = 0.3.</p>
+  <p><i>w</i>&middot;<i>x</i> = 0.5&times;1 + (&minus;1)&times;2 + 2&times;(&minus;1) = 0.5 &minus; 2 &minus; 2 = &minus;3.5. Adding the bias: &minus;3.5 + 0.3 = <b>&minus;3.2</b>. If the activation is ReLU (Chapter 7), the final output is max(0, &minus;3.2) = <b>0</b> &mdash; this particular neuron did not "fire" for this particular input.</p>
+</div>
+
+<p>A <b>layer</b> is many neurons applied to the same input in parallel, each with its own weight vector &mdash; stack those weight vectors as rows and you get exactly the matrix <i>W</i> from Chapter 2, so a full layer is <i>y</i> = activation(<i>Wx</i> + <i>b</i>). A <b>multi-layer perceptron (MLP)</b> is several such layers chained one after another, each one's output feeding the next one's input. Every "MLP" mentioned anywhere in this project &mdash; the update rule inside Emergent Attention (Chapter 23), the feed-forward block inside every Transformer block (Chapter 16) &mdash; is exactly this: a small stack of linear layers with activations between them.</p>
+
+<div class="chap-eyebrow">Chapter 7 &middot; Part II</div>
+<h1 class="chapter">Activation Functions: ReLU and Softmax</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>Why not just stack linear layers directly, with no activation function between them? Because a linear function of a linear function is <i>still just a linear function</i> &mdash; no amount of stacking gains any expressive power. Activation functions are what let a network represent curved, complex relationships instead of only straight-line ones.</p>
+</div>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; why linear layers alone don't help</span>
+  <p>Let layer 1 compute <i>y</i> = 2<i>x</i> + 1, and layer 2 compute <i>z</i> = 3<i>y</i> &minus; 4, with no activation function between them. Substituting: <i>z</i> = 3(2<i>x</i>+1) &minus; 4 = 6<i>x</i> &minus; 1. That is still just one linear function of <i>x</i> &mdash; a straight line with slope 6. Two layers collapsed into exactly what one layer could already do. This is why every real network inserts a nonlinear activation between linear layers: without it, "depth" is an illusion.</p>
+</div>
+
+<h2>ReLU (Rectified Linear Unit)</h2>
+<p>The activation used inside the Emergent Attention update MLP (Chapter 23) and throughout this project's networks is the simplest nonlinearity in common use:</p>
+<div class="formula">ReLU(x) = max(0, x)</div>
+<p>It passes positive numbers through unchanged and clamps every negative number to exactly zero. Despite &mdash; or because of &mdash; this simplicity, it's the default choice for most modern networks: it's cheap to compute, and its derivative is trivial (1 for <i>x</i>&gt;0, 0 for <i>x</i>&lt;0), which keeps gradients (Chapter 3) well-behaved during training.</p>
+
+<h2>Softmax</h2>
+<p>ReLU acts on one number at a time. <b>Softmax</b> acts on a whole vector at once, and is used specifically to turn an arbitrary list of numbers ("logits") into a valid probability distribution &mdash; all values between 0 and 1, summing to exactly 1.</p>
+<div class="formula">softmax(z)<sub>i</sub> = e<sup>z<sub>i</sub></sup> / &Sigma;<sub>j</sub> e<sup>z<sub>j</sub></sup></div>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; softmax over 3 classes</span>
+  <p>Suppose a network outputs three raw scores ("logits") for three classes: <i>z</i> = (2.0, 1.0, 0.1) &mdash; higher means "more confident in this class," but these numbers aren't probabilities yet (they don't sum to 1 and can be negative).</p>
+  <table><tr><th>class</th><th>z<sub>i</sub></th><th>e<sup>z<sub>i</sub></sup></th><th>softmax(z)<sub>i</sub></th></tr>
+  <tr><td>A</td><td>2.0</td><td>7.389</td><td>0.659</td></tr>
+  <tr><td>B</td><td>1.0</td><td>2.718</td><td>0.242</td></tr>
+  <tr><td>C</td><td>0.1</td><td>1.105</td><td>0.099</td></tr>
+  <tr><td>sum</td><td></td><td>11.212</td><td>1.000</td></tr></table>
+  <p>0.659 + 0.242 + 0.099 = 1.000. The network is now saying "65.9% confident it's class A" &mdash; a genuine probability distribution, obtained from arbitrary real-valued scores just by exponentiating and normalizing. Softmax reappears twice more in this book: turning attention scores into weights (Chapter 15), and turning a classifier's final logits into the class probabilities used to compute loss (Chapter 8).</p>
+</div>
+
+<div class="chap-eyebrow">Chapter 8 &middot; Part II</div>
+<h1 class="chapter">Measuring Wrongness: Loss and Cross-Entropy</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>Before a network can improve, it needs a single number that says <i>how wrong</i> its current prediction is &mdash; low when the prediction is good, high when it's bad. That number is called the <b>loss</b>. Training a network is nothing more than adjusting its weights (Chapter 6) to make this one number smaller, using the gradient (Chapter 3) to know which direction "smaller" is in.</p>
+</div>
+
+<h2>Cross-entropy loss</h2>
+<p>For classification (choosing among several categories, exactly this project's task), the standard loss is <b>cross-entropy</b>: given the model's predicted probability for the <i>correct</i> class, <i>p</i><sub>correct</sub>, the loss is</p>
+<div class="formula">L = &minus;log(p<sub>correct</sub>)</div>
+<p>This is small when <i>p</i><sub>correct</sub> is close to 1 (confident and right) and grows rapidly as <i>p</i><sub>correct</sub> approaches 0 (confident and wrong) &mdash; exactly the shape you'd want a penalty to have.</p>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; cross-entropy on the softmax output above</span>
+  <p>Continuing the 3-class example: suppose the true label is class A, with softmax probability <i>p</i><sub>A</sub> = 0.659. <i>L</i> = &minus;log(0.659) = <b>0.417</b> (natural log). Now compare a worse prediction where the model was less confident in the correct answer, say <i>p</i><sub>A</sub> = 0.1: <i>L</i> = &minus;log(0.1) = <b>2.303</b> &mdash; more than 5&times; the loss, for a prediction that's "somewhat unsure" rather than "confidently right." This is exactly the signal gradient descent (Chapter 9) uses to push weights toward increasing <i>p</i><sub>correct</sub>.</p>
+</div>
+
+<h2>Label smoothing</h2>
+<p>Cross-entropy as defined above pushes the network toward <i>p</i><sub>correct</sub> = 1.0 exactly &mdash; total, unshakeable confidence. In practice this tends to make networks overconfident and can hurt generalization. <b>Label smoothing</b> softens the target: instead of the correct class having target probability 1.0 and every other class 0.0, the correct class gets target 1&minus;&epsilon; and the remaining probability &epsilon; is spread evenly across the other classes.</p>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; label smoothing, &epsilon;=0.1, 3 classes</span>
+  <p>Without smoothing, the target for class A is (1, 0, 0). With &epsilon;=0.1 spread over the 2 other classes (each gets &epsilon;/2 = 0.05): the target becomes (0.9, 0.05, 0.05). This project uses &epsilon;=0.1 across 100 classes (CIFAR-100, Chapter 29), so each incorrect class receives a tiny target of 0.1/99 &asymp; 0.001 &mdash; negligible per class, but collectively it prevents the loss from ever reaching exactly zero for a "perfect," maximally overconfident prediction, which is precisely the point.</p>
+</div>
+
+<div class="chap-eyebrow">Chapter 9 &middot; Part II</div>
+<h1 class="chapter">Gradient Descent and Backpropagation</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>Imagine standing on a hillside in fog, trying to reach the lowest point, able to feel only the slope directly under your feet. The obvious strategy: take a step in the downhill direction, feel the new slope, step again, repeat. <b>Gradient descent</b> is exactly this strategy applied to a network's loss (Chapter 8), where "the hillside" is the loss as a function of every weight, and "feeling the slope" is computing the gradient (Chapter 3).</p>
+</div>
+
+<div class="formula">w &larr; w &minus; &eta; &middot; &nabla;<sub>w</sub>L<span class="lbl2">&eta; (eta) is the learning rate &mdash; how big a step to take</span></div>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; gradient descent on f(w)=(w&minus;3)<sup>2</sup></span>
+  <p>The minimum is obviously at <i>w</i>=3 (where <i>f</i>=0). Pretend we don't know that, and start at <i>w</i><sub>0</sub>=0 with learning rate <i>&eta;</i>=0.3. The derivative is <i>f</i>&prime;(<i>w</i>)=2(<i>w</i>&minus;3).</p>
+  <table><tr><th>step</th><th>w</th><th>f(w)</th><th>gradient 2(w&minus;3)</th><th>next w = w &minus; 0.3&middot;grad</th></tr>
+  <tr><td>0</td><td>0.000</td><td>9.000</td><td>&minus;6.000</td><td>1.800</td></tr>
+  <tr><td>1</td><td>1.800</td><td>1.440</td><td>&minus;2.400</td><td>2.520</td></tr>
+  <tr><td>2</td><td>2.520</td><td>0.230</td><td>&minus;0.960</td><td>2.808</td></tr>
+  <tr><td>3</td><td>2.808</td><td>0.037</td><td>&minus;0.384</td><td>2.923</td></tr>
+  <tr><td>4</td><td>2.923</td><td>0.006</td><td>&minus;0.154</td><td>2.969</td></tr></table>
+  <p>Five steps, no calculus beyond "compute the slope, step against it," and <i>w</i> has already moved from 0 to 2.969 &mdash; visibly converging toward the true minimum at 3. This is, quite literally, the entire algorithm that trained every model in this project; the only difference is that instead of one weight <i>w</i>, there are millions, and instead of a simple bowl-shaped <i>f</i>, the loss landscape is an extremely complex high-dimensional surface. The mechanics are identical.</p>
+</div>
+
+<h2>Backpropagation</h2>
+<p>Gradient descent needs the gradient of the loss with respect to <i>every</i> weight in the network, including weights buried in the very first layer, many layers away from where the loss is computed. <b>Backpropagation</b> is the algorithm that computes all of these efficiently, in one backward pass, using nothing more than the chain rule (Chapter 3) applied layer by layer, from the output back to the input.</p>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>Picture the network as a chain of functions: input &rarr; layer 1 &rarr; layer 2 &rarr; &hellip; &rarr; loss. To know how a weight in layer 1 affects the loss, the chain rule says: multiply "how layer 1's output affects layer 2's output" by "how layer 2's output affects layer 3's output" &hellip; all the way to "how the last layer's output affects the loss." Backpropagation computes this efficiently by starting at the loss and working backward one layer at a time, reusing each layer's result for every earlier layer &mdash; instead of recomputing the whole chain from scratch for every single weight.</p>
+</div>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight</span>
+  <p>You will never need to derive a backpropagation formula by hand for this project &mdash; the software framework (PyTorch) does it automatically for any computation you define, including the Emergent Attention mechanism in Chapter 23. What matters for understanding the project is knowing <i>what</i> that automatic machinery is doing: repeated chain-rule multiplication, nothing more mysterious than Chapter 3's worked example, just applied many more times.</p>
+</div>
+
+<h2>From plain gradient descent to AdamW</h2>
+<p>Plain gradient descent (as worked out above) uses the same step size for every weight and has no memory of past steps. In practice this is slow and easily gets stuck oscillating in narrow valleys of the loss surface. <b>Adam</b> improves on it by keeping a running average of each weight's recent gradients (so it builds "momentum" in a consistent direction) and a running average of each weight's recent squared gradients (so weights with noisy, erratic gradients get automatically smaller, more cautious steps, and weights with smooth, consistent gradients get to move faster). <b>AdamW</b> (used throughout this project) additionally separates "weight decay" &mdash; a small constant pull of every weight toward zero, which discourages any single weight from growing unnecessarily large and helps prevent overfitting (Chapter 10) &mdash; from the adaptive gradient step, applying it directly rather than folding it into the gradient calculation the way older implementations did. This project uses AdamW with weight decay 0.05 for every model reported (Appendix A of the paper).</p>
+
+<div class="chap-eyebrow">Chapter 10 &middot; Part II</div>
+<h1 class="chapter">The Full Training Recipe</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>Gradient descent (Chapter 9) tells you how one weight update works. But real training runs it hundreds of thousands of times, over a schedule of settings that change as training progresses, plus a set of tricks that make the network generalize to images it has never seen rather than merely memorize the ones it was shown. This chapter builds every piece of the exact recipe used for every model in this project, one at a time.</p>
+</div>
+
+<h2>Batches and epochs</h2>
+<p>Computing the exact gradient over the entire 50,000-image training set before every single weight update would be extremely slow. Instead, training uses <b>mini-batches</b>: a small random subset of images (this project uses <b>batch size 64</b>) at a time, computing an approximate gradient from just those 64 images, and updating weights immediately. One full pass through the entire training set, in batches, is one <b>epoch</b>. This project trains for <b>300 epochs</b> &mdash; 300 full passes over the data, each broken into many 64-image batches.</p>
+
+<h2>Learning rate schedule: cosine annealing with warmup</h2>
+<p>The learning rate <i>&eta;</i> (Chapter 9) doesn't stay fixed throughout training. Two adjustments are used together:</p>
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p><b>Warmup</b>: for the first few epochs, start the learning rate near zero and ramp it up gradually. Early in training the weights are random and the gradients can be erratic; a large step size applied immediately can knock the network into a bad region it never recovers from. Ramping up gives the network a few epochs to settle before taking full-sized steps. <b>Cosine annealing</b>: after warmup, decrease the learning rate smoothly, following the shape of one quarter of a cosine curve, down toward (near) zero by the end of training. Large steps early (once warmed up) let the network explore broadly; small steps late let it settle precisely into a good minimum without overshooting.</p>
+</div>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; the schedule's shape, illustratively</span>
+  <p>This project uses a peak learning rate of 5&times;10<sup>&minus;4</sup>, a 10-epoch linear warmup, then cosine decay over the remaining 290 of the 300 total epochs:</p>
+  <table><tr><th>epoch</th><th>phase</th><th>approx. learning rate</th></tr>
+  <tr><td>1</td><td>warmup</td><td>0.00005</td></tr>
+  <tr><td>10</td><td>warmup complete</td><td>0.00050 (peak)</td></tr>
+  <tr><td>150</td><td>cosine decay (midpoint)</td><td>0.00025</td></tr>
+  <tr><td>300</td><td>cosine decay (end)</td><td>&asymp;0.00000</td></tr></table>
+</div>
+
+<h2>Overfitting, and why augmentation fights it</h2>
+<div class="box defn">
+  <span class="box-lbl">Definition</span>
+  <p><b>Overfitting</b>: when a network becomes so specialized to the exact training images it has seen that it stops generalizing to new ones &mdash; training accuracy keeps climbing while accuracy on held-out test images stalls or drops. With only 50,000 training images and millions of weights, overfitting is a real risk, especially since this project trains every model from random initialization with no ImageNet pretraining (Chapter 29). The recipe below exists almost entirely to fight this.</p>
+</div>
+
+<h3>Mixup and CutMix</h3>
+<p><b>Mixup</b> creates new training examples by blending two real images and their labels together: pick a mixing ratio <i>&lambda;</i> (drawn randomly, biased toward values near 0 or 1 by a Beta distribution), then <i>x</i><sub>new</sub> = <i>&lambda;x</i><sub>1</sub> + (1&minus;<i>&lambda;</i>)<i>x</i><sub>2</sub>, and correspondingly blend the two labels: <i>y</i><sub>new</sub> = <i>&lambda;y</i><sub>1</sub> + (1&minus;<i>&lambda;</i>)<i>y</i><sub>2</sub>. <b>CutMix</b> does the analogous thing spatially &mdash; cutting a rectangular patch from one image into another, with the label mixed in proportion to the patch's area.</p>
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; Mixup on two toy 3-class labels</span>
+  <p>Image 1 is class A (target (1,0,0)), image 2 is class B (target (0,1,0)), and the draw gives <i>&lambda;</i>=0.7. The blended image is 70% image 1's pixels plus 30% image 2's pixels; the blended target is 0.7&times;(1,0,0) + 0.3&times;(0,1,0) = <b>(0.7, 0.3, 0)</b>. The network is trained to predict this exact soft target &mdash; "mostly class A, somewhat class B" &mdash; on an image that is genuinely a blend of the two, which forces it to learn more robust, less brittle decision boundaries than always seeing pure, single-class images.</p>
+</div>
+<p>This project applies Mixup (<i>&alpha;</i>=0.8) and CutMix (<i>&alpha;</i>=1.0) each with 50% probability per batch, on every CIFAR-100 model. Chapter 37 covers a specific, important exception: Mixup/CutMix were <i>disabled</i> for the BUSI ultrasound experiments, and explains exactly why with a worked example of what goes wrong when they aren't.</p>
+
+<h3>RandAugment and Random Erasing</h3>
+<p><b>RandAugment</b> randomly applies a sequence of simple image transformations (rotation, color shifts, sharpness changes, and more) at random strengths, forcing the network to be invariant to superficial variation rather than the details of any single training image. <b>Random Erasing</b> randomly blacks out a rectangular region of the image (this project: with 25% probability per image), forcing the network to classify correctly even when part of the object is occluded &mdash; directly relevant to this project's later corruption-robustness experiments (Chapter 33), since it means <i>every</i> model, not just the NCA-based ones, was already trained with some exposure to partial information loss.</p>
+
+<h2>Exponential Moving Average (EMA) of weights</h2>
+<p>Because mini-batch gradients (Chapter 9) are noisy approximations, the weights bounce around somewhat even late in training, instead of settling perfectly smoothly. <b>EMA</b> maintains a second, separate copy of the weights that is updated as a slow-moving average of the real (noisy) training weights, and it is this smoothed copy that is actually evaluated and reported.</p>
+<div class="formula">&theta;<sub>EMA</sub> &larr; d &middot; &theta;<sub>EMA</sub> + (1&minus;d) &middot; &theta;<sub>current</sub><span class="lbl2">d = decay rate, this project uses d = 0.9999</span></div>
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; EMA smoothing a noisy sequence</span>
+  <p>Using a much smaller decay (<i>d</i>=0.5, for a short example you can trace by hand) on a toy weight bouncing between 1 and 3 every step: <i>&theta;</i>=1, 3, 1, 3, 1&hellip; Starting <i>&theta;</i><sub>EMA</sub>=1: step to 3 &rarr; 0.5&times;1+0.5&times;3=2.0; step to 1 &rarr; 0.5&times;2.0+0.5&times;1=1.5; step to 3 &rarr; 0.5&times;1.5+0.5&times;3=2.25; step to 1 &rarr; 0.5&times;2.25+0.5&times;1=1.625. The EMA settles toward the middle of the oscillation (2.0) instead of bouncing with it. At the project's real decay of 0.9999, each update moves the EMA copy only 0.01% of the way toward the current weights &mdash; an extremely slow, heavily smoothed average that damps out batch-to-batch noise almost entirely.</p>
+</div>
+
+<h2>AMP (Automatic Mixed Precision) and gradient clipping</h2>
+<p>Every number in a network is normally stored with 32 bits of precision (float32). <b>AMP</b> performs most computation in 16-bit precision instead, which is roughly twice as fast and uses half the memory on modern GPUs, while keeping a small number of numerically sensitive operations (like the final loss accumulation) in 32-bit precision to avoid instability. <b>Gradient clipping</b> (this project: clipped to a maximum norm of 1.0) simply rescales the gradient if its overall magnitude exceeds a threshold, preventing a single unusually large, noisy gradient from taking a destructively large step.</p>
+
+<h2>Reproducibility: the random seed</h2>
+<p>Every "random" choice in this recipe &mdash; which images land in which batch, Mixup's <i>&lambda;</i>, RandAugment's random transforms, the Bernoulli gate inside Emergent Attention (Chapter 23) &mdash; is generated by a pseudo-random number generator that is fully determined by a starting number called the <b>seed</b>. Fixing the seed (this project defaults to <b>seed 42</b>, with seeds 123 and 7 also used for specific multi-seed checks in Chapters 31 and 37) means the entire sequence of "random" events is exactly reproducible &mdash; rerunning the same command with the same seed reproduces the identical training run, which is what makes the project's Reproducibility Statement (a real, checkable claim in the paper) possible at all.</p>
+
+<div class="checkpoint">
+  <span class="box-lbl">Checkpoint &mdash; the recipe, as one table</span>
+  <p>Every field below (Appendix A of the paper) should now read as a specific, understood choice rather than jargon:</p>
+  <ul>
+    <li><b>AdamW</b>, learning rate 5&times;10<sup>&minus;4</sup>, weight decay 0.05 (Chapter 9)</li>
+    <li><b>300 epochs</b>, batch size 64, 10-epoch linear warmup then cosine decay (this chapter)</li>
+    <li><b>Label smoothing 0.1</b> (Chapter 8)</li>
+    <li><b>Mixup (&alpha;=0.8) + CutMix (&alpha;=1.0)</b>, each at 50% probability; RandAugment(2,9); Random Erasing (p=0.25) (this chapter)</li>
+    <li><b>AMP</b> mixed precision, gradient clipping at norm 1.0, <b>EMA</b> decay 0.9999 (this chapter)</li>
+    <li><b>Seed 42</b> as default, with 123 and 7 used for specific reruns (this chapter)</li>
+  </ul>
+</div>
+
+<div class="part-title">
+  <div class="part-num">Part III</div>
+  <div class="part-name">Seeing Like a Convolution</div>
+  <div class="part-desc"><p style="text-align:left;">Three chapters on the classical computer-vision operation this project reuses inside its core mechanism: sliding a small window over an image, and how a handful of fixed, hand-designed 3&times;3 windows can detect edges without any learning at all. This is the machinery behind the "perception" step in Chapter 23.</p></div>
+  <div class="part-chapters">
+    <div>11. Convolution: Sliding a Small Window Over an Image</div>
+    <div>12. Edge Detection: The Sobel Filters</div>
+    <div>13. Receptive Fields: How Far Can One Cell See?</div>
+  </div>
+</div>
+
+<div class="chap-eyebrow">Chapter 11 &middot; Part III</div>
+<h1 class="chapter">Convolution: Sliding a Small Window Over an Image</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>Take a small grid of numbers (a "kernel" or "filter," commonly 3&times;3), lay it over one corner of an image, multiply each overlapping pair of numbers, sum the results into a single output number, then slide the kernel one pixel over and repeat, until it's swept across the entire image. The output is a new, usually smaller, grid &mdash; one number per position the kernel stopped at. That sliding-multiply-sum procedure is a <b>convolution</b> (more precisely, what deep-learning frameworks implement is technically <b>cross-correlation</b> &mdash; true mathematical convolution flips the kernel first; the distinction almost never matters in practice, and this book uses "convolution" the way the field does, to mean the unflipped sliding operation).</p>
+</div>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; one convolution output value, by hand</span>
+  <p>A 3&times;3 patch of an image, and a 3&times;3 kernel:</p>
+  <div class="pixgrid">
+    <div><table><tr><td class="hl">4</td><td class="hl">2</td><td class="hl">0</td></tr><tr><td class="hl">5</td><td class="hl">3</td><td class="hl">1</td></tr><tr><td class="hl">6</td><td class="hl">4</td><td class="hl">2</td></tr></table><div class="glabel">image patch</div></div>
+    <div><table><tr><td>1</td><td>0</td><td>&minus;1</td></tr><tr><td>1</td><td>0</td><td>&minus;1</td></tr><tr><td>1</td><td>0</td><td>&minus;1</td></tr></table><div class="glabel">kernel</div></div>
+  </div>
+  <p>Multiply each overlapping pair and sum: (4&times;1)+(2&times;0)+(0&times;&minus;1) + (5&times;1)+(3&times;0)+(1&times;&minus;1) + (6&times;1)+(4&times;0)+(2&times;&minus;1) = (4+0+0) + (5+0&minus;1) + (6+0&minus;2) = 4 + 4 + 4 = <b>12</b>. That single number, 12, becomes one entry of the output grid. Slide the kernel one column to the right (over new image pixels), get the next output entry, and so on across the whole image. Notice this is exactly the dot-product-and-sum arithmetic from Chapter 1, just applied to a 3&times;3 neighborhood instead of an arbitrary-length vector.</p>
+</div>
+
+<h2>Depthwise convolution</h2>
+<p>A color image (or, in this project, a 192-channel patch grid, Chapter 1) has many channels, not one. A standard convolution mixes all input channels together into each output channel. A <b>depthwise</b> convolution instead applies a separate, independent kernel to each channel on its own, never mixing channels together spatially. This project's perception step (Chapter 23) is depthwise specifically so that each of the 192 channels is filtered independently and identically, with no cross-channel mixing happening inside the convolution itself &mdash; any mixing across channels happens afterward, inside the update MLP (Chapter 6).</p>
+
+<div class="chap-eyebrow">Chapter 12 &middot; Part III</div>
+<h1 class="chapter">Edge Detection: The Sobel Filters</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>Some 3&times;3 kernels aren't learned at all &mdash; they're hand-designed by decades-old computer vision research to detect one specific, simple pattern: an edge. A vertical edge (bright on the left, dark on the right, or vice versa) produces a large convolution output under one particular kernel and a near-zero output under it if the region is flat/uniform. That kernel is the <b>Sobel-X</b> filter, and this project uses it, completely unchanged from classical image processing, as one of its three fixed "perception" filters.</p>
+</div>
+
+<div class="kernels">
+  <div class="kernel"><table><tr><td>&minus;1</td><td>0</td><td>1</td></tr><tr><td>&minus;2</td><td>0</td><td>2</td></tr><tr><td>&minus;1</td><td>0</td><td>1</td></tr></table><div class="kname">Sobel-X<br>(detects vertical edges)</div></div>
+  <div class="kernel"><table><tr><td>&minus;1</td><td>&minus;2</td><td>&minus;1</td></tr><tr><td>0</td><td>0</td><td>0</td></tr><tr><td>1</td><td>2</td><td>1</td></tr></table><div class="kname">Sobel-Y<br>(detects horizontal edges)</div></div>
+  <div class="kernel"><table><tr><td>0</td><td>0</td><td>0</td></tr><tr><td>0</td><td>1</td><td>0</td></tr><tr><td>0</td><td>0</td><td>0</td></tr></table><div class="kname">Identity<br>(passes the center value through, unchanged)</div></div>
+</div>
+
+<p>Sobel-X approximates the horizontal rate of change of brightness (a discrete derivative, Chapter 3, computed across the image instead of across time) &mdash; it subtracts the left column's values from the right column's values, with the middle row weighted twice as heavily to slightly favor the pixels directly beside center. Sobel-Y is the same idea rotated 90&deg;, comparing top to bottom instead of left to right. The Identity kernel does nothing at all to the values &mdash; it exists so that the network always has direct, unfiltered access to the raw value at each position, alongside the two edge responses.</p>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; Sobel-X on an edge, vs. on a flat region</span>
+  <p><b>Case 1, a vertical edge</b> (left column bright = 9, right column dark = 1):</p>
+  <div class="pixgrid">
+    <div><table><tr><td class="hl">9</td><td class="hl">5</td><td class="hl">1</td></tr><tr><td class="hl">9</td><td class="hl">5</td><td class="hl">1</td></tr><tr><td class="hl">9</td><td class="hl">5</td><td class="hl">1</td></tr></table><div class="glabel">bright&nbsp;&rarr;&nbsp;dark, left to right</div></div>
+  </div>
+  <p>Sobel-X response: (9&times;&minus;1)+(5&times;0)+(1&times;1) + (9&times;&minus;2)+(5&times;0)+(1&times;2) + (9&times;&minus;1)+(5&times;0)+(1&times;1) = (&minus;9+0+1)+(&minus;18+0+2)+(&minus;9+0+1) = &minus;8 &minus;16 &minus;8 = <b>&minus;32</b>. A large-magnitude response &mdash; the filter strongly detects that brightness is changing left-to-right.</p>
+  <p><b>Case 2, a flat region</b> (every pixel = 5):</p>
+  <p>Sobel-X response: every term is 5&times;(&minus;1, 0, 1, &minus;2, 0, 2, &minus;1, 0, 1) summed = 5&times;(&minus;1+0+1&minus;2+0+2&minus;1+0+1) = 5&times;0 = <b>0</b>. No brightness change, no response &mdash; exactly the behavior an edge detector should have.</p>
+</div>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight</span>
+  <p>These filters detect local structure &mdash; edges, texture, gradient direction &mdash; using nine fixed numbers each, with no training involved. This project deliberately keeps them fixed rather than learned (a design decision defended in detail in Chapter 24); the point to take from this chapter alone is simply that "detecting an edge" is a completely well-defined, small, hand-computable arithmetic operation, not a mysterious learned black box.</p>
+</div>
+
+<div class="chap-eyebrow">Chapter 13 &middot; Part III</div>
+<h1 class="chapter">Receptive Fields: How Far Can One Cell See?</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>A single 3&times;3 convolution, applied once, lets each output value "see" only its own immediate 3&times;3 neighborhood in the input &mdash; it has no idea what's happening two pixels further away. But stack the operation, applying it again to its own output, and something changes: each position in the <i>second</i> application already summarizes its own 3&times;3 neighborhood of <i>first-application</i> outputs, each of which already summarized its own neighborhood &mdash; so after two applications, one output value has been influenced by a 5&times;5 region of the original input. The <b>receptive field</b> of a position is exactly this: the region of the original input that can possibly affect its value, and it grows with every additional layer or iteration of local computation.</p>
+</div>
+
+<p>For a stack of <i>K</i> applications of a 3&times;3 kernel (stride 1, no downsampling), the receptive field is a square of side length:</p>
+<div class="formula">(2K + 1) &times; (2K + 1)</div>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; receptive field growth</span>
+  <table><tr><th>Iterations K</th><th>Receptive field side, 2K+1</th><th>Area (patches)</th></tr>
+  <tr><td>1</td><td>3</td><td>9</td></tr>
+  <tr><td>2</td><td>5</td><td>25</td></tr>
+  <tr><td>3</td><td>7</td><td>49</td></tr>
+  <tr><td>4</td><td><b>9</b></td><td><b>81</b></td></tr></table>
+  <p>This project's Emergent Attention mechanism (Chapter 23) runs <i>K</i>=4 iterations, so the theoretical bound predicts a 9&times;9-patch receptive field per NCA block &mdash; each cell's output can in principle be influenced by information from up to 81 patches away from where it started, despite every individual step only ever looking at its immediate 8 neighbors. Chapter 38 measures this directly in the trained network and checks it against the (2K+1) prediction above.</p>
+</div>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight</span>
+  <p>This is the mathematical heart of why "iterated local computation" is a real alternative to "one big global computation" (standard attention, Part IV): repetition of a small local rule grows the effective field of view linearly with the number of iterations, without ever requiring any single step to look further than its immediate neighbors. Part V (Cellular Automata) builds directly on this exact idea, and Chapter 23 puts a full trainable mechanism on top of it.</p>
+</div>
+
+<div class="part-title">
+  <div class="part-num">Part IV</div>
+  <div class="part-name">Attention and the Vision Transformer</div>
+  <div class="part-desc"><p style="text-align:left;">Five chapters on the mechanism this project's Emergent Attention exists to replace: how an image becomes a sequence a network can process, how self-attention lets every token look at every other token, and the three baseline networks (ViT, DeiT, Swin) this project measures itself against.</p></div>
+  <div class="part-chapters">
+    <div>14. Turning an Image into Tokens</div>
+    <div>15. Self-Attention: Query, Key, Value</div>
+    <div>16. Multi-Head Attention and the Transformer Block</div>
+    <div>17. The Cost of Attention, and Why It Matters</div>
+    <div>18. The Baselines: ViT, DeiT, Swin</div>
+  </div>
+</div>
+
+<div class="chap-eyebrow">Chapter 14 &middot; Part IV</div>
+<h1 class="chapter">Turning an Image into Tokens</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>A Transformer (Chapter 16) was originally designed for language &mdash; sequences of word tokens. A <b>Vision Transformer (ViT)</b> makes an image look like such a sequence: cut it into a grid of small square patches, and treat each patch as one "token," exactly the way a sentence is a sequence of word tokens.</p>
+</div>
+
+<h2>Patch embedding</h2>
+<p>Recall from Chapter 1: this project uses 224&times;224 images cut into 16&times;16-pixel patches, giving a 14&times;14 grid, <i>n</i>=196 patches. Each raw patch is 16&times;16&times;3 = 768 numbers. A single linear layer (Chapter 2) &mdash; the <b>patch embedding</b> &mdash; maps each flattened 768-number patch down to a <i>D</i>=192-dimensional vector. This is exactly the "linear layer" worked example from Chapter 2, just with a 768-in, 192-out weight matrix instead of the tiny 2-in, 3-out one used there.</p>
+
+<h2>The CLS token</h2>
+<p>Alongside the 196 patch vectors, standard ViT prepends one extra, <i>learned</i> vector called the <b>CLS token</b> (short for "classification"). It carries no image information of its own at the start; its entire purpose is to gather information from every patch token via attention (Chapter 15) as it passes through the network, so that by the final layer, the CLS token's vector summarizes the whole image and can be handed to a small classifier head to produce the final prediction.</p>
+<div class="box pitfall">
+  <span class="box-lbl">Note &mdash; this project doesn't always use CLS this way</span>
+  <p>This project's Hybrid and Pure NCA-ViT models still carry a CLS token through the network (so it's directly comparable to standard ViT/DeiT), but they classify using <b>global average pooling (GAP)</b> over the 196 patch tokens instead of reading the CLS token. The reason is Chapter 23's design: the CLS token is deliberately excluded from the NCA computation in every NCA block, so for the first six layers of the Hybrid model, CLS never receives any image-dependent information at all &mdash; reading it directly for classification would mean reading a vector that's blind to everything the network's early layers actually computed. GAP pooling over the patch tokens sidesteps this entirely. Chapter 24 explains the CLS-isolation design choice itself in full.</p>
+</div>
+
+<h2>Position embeddings</h2>
+<p>A convolution (Chapter 11) inherently knows about spatial order &mdash; a 3&times;3 kernel only ever looks at adjacent pixels. Self-attention (Chapter 15) has no such built-in sense of position: mathematically, it treats the sequence of tokens as an unordered set unless something explicitly tells it otherwise. A learned <b>position embedding</b> &mdash; one more vector, one per patch position, added directly to that patch's content vector &mdash; is how ViT gives the network access to "where in the grid did this token come from."</p>
+
+<div class="chap-eyebrow">Chapter 15 &middot; Part IV</div>
+<h1 class="chapter">Self-Attention: Query, Key, Value</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>For each token, self-attention asks three separate questions, computed from that token's vector by three separate learned linear layers (Chapter 2): a <b>Query</b> ("what information am I looking for?"), a <b>Key</b> ("what information do I advertise having?"), and a <b>Value</b> ("what information will I actually hand over, if asked?"). Every token's Query is compared &mdash; via dot product (Chapter 1) &mdash; against every other token's Key, producing a relevance score for every pair. Those scores are turned into weights (via softmax, Chapter 7), and each token's final output is a weighted blend of every token's Value, weighted by how relevant that token's Key was to this token's Query.</p>
+</div>
+
+<div class="formula">Q = XW<sub>Q</sub>,&nbsp;&nbsp; K = XW<sub>K</sub>,&nbsp;&nbsp; V = XW<sub>V</sub></div>
+<div class="formula">Attention(Q,K,V) = softmax( QK<sup>T</sup> / &radic;d<sub>k</sub> ) V<span class="lbl2">d<sub>k</sub> = the dimension of each Key/Query vector; dividing by &radic;d<sub>k</sub> keeps the dot products from growing too large as dimension increases, which would push softmax toward an almost one-hot output</span></div>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; full self-attention, 3 tokens, dimension 2</span>
+  <p>To keep the arithmetic hand-checkable, skip the <i>W<sub>Q</sub></i>/<i>W<sub>K</sub></i>/<i>W<sub>V</sub></i> projection step (in a real network these come from learned matrices exactly like Chapter 2) and start directly from three tokens' already-computed Query, Key, and Value vectors (dimension <i>d<sub>k</sub></i>=2):</p>
+  <table><tr><th>token</th><th>Query</th><th>Key</th><th>Value</th></tr>
+  <tr><td>1</td><td>(1, 0)</td><td>(1, 0)</td><td>(10, 0)</td></tr>
+  <tr><td>2</td><td>(0, 1)</td><td>(0, 1)</td><td>(0, 10)</td></tr>
+  <tr><td>3</td><td>(1, 1)</td><td>(1, 1)</td><td>(5, 5)</td></tr></table>
+  <p><b>Step 1 &mdash; compute token 1's output.</b> Dot Query<sub>1</sub>=(1,0) against every Key: Q<sub>1</sub>&middot;K<sub>1</sub>=1&times;1+0&times;0=1;&nbsp; Q<sub>1</sub>&middot;K<sub>2</sub>=1&times;0+0&times;1=0;&nbsp; Q<sub>1</sub>&middot;K<sub>3</sub>=1&times;1+0&times;1=1.</p>
+  <p><b>Step 2 &mdash; scale by &radic;d<sub>k</sub> = &radic;2 &asymp; 1.414:</b> scores become (0.707, 0, 0.707).</p>
+  <p><b>Step 3 &mdash; softmax</b> (Chapter 7): e<sup>0.707</sup>=2.028, e<sup>0</sup>=1.000, e<sup>0.707</sup>=2.028, sum=5.056 &rarr; weights = (0.401, 0.198, 0.401).</p>
+  <p><b>Step 4 &mdash; weighted sum of Values:</b> 0.401&times;(10,0) + 0.198&times;(0,10) + 0.401&times;(5,5) = (4.01,&nbsp;0) + (0,&nbsp;1.98) + (2.005,&nbsp;2.005) = <b>(6.02, 3.98)</b>.</p>
+  <p>Token 1's new representation, after attention, is (6.02, 3.98) &mdash; a blend dominated by tokens 1 and 3 (whose Keys aligned most closely with token 1's Query, each getting 40.1% of the weight), with a smaller contribution from token 2 (19.8%, since its Key was less aligned). Every one of the 196 tokens in this project's real attention blocks computes an output exactly this way, simultaneously, at 192 dimensions instead of 2.</p>
+</div>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight</span>
+  <p>Self-attention's defining property, visible directly in the worked example: <b>every token's output can depend on every other token, in a single step</b>, with the dependency strength (the weights) determined dynamically by content, not fixed in advance the way a convolution's neighborhood is. This is exactly what Emergent Attention (Chapter 23) gives up, in exchange for locality and iteration &mdash; and exactly the trade this whole book is building toward being able to evaluate precisely.</p>
+</div>
+
+<div class="chap-eyebrow">Chapter 16 &middot; Part IV</div>
+<h1 class="chapter">Multi-Head Attention and the Transformer Block</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>One attention computation captures one notion of "relevance." Real Transformers run several attention computations in parallel &mdash; "heads" &mdash; each with its own separate Query/Key/Value projections, on separate, smaller slices of the token's dimension, so different heads are free to specialize in different kinds of relationships (one might learn to track color similarity, another spatial adjacency, and so on), before their outputs are concatenated back together and passed through one more linear layer.</p>
+</div>
+
+<p>With <i>D</i>=192 and 3 heads (the configuration used for every attention-based model in this project, including the second half of the Hybrid architecture), each head operates on a <i>D</i>/3 = 64-dimensional slice, running the exact procedure from Chapter 15 independently, then the three 64-dimensional outputs are concatenated back into a 192-dimensional vector and passed through a final linear projection.</p>
+
+<h2>LayerNorm</h2>
+<p>Before both the attention step and the MLP step, each token's vector is passed through <b>Layer Normalization</b>: subtract that token's own mean and divide by that token's own standard deviation, then rescale with two learned parameters. This keeps the numbers flowing through the network in a stable, consistent range at every layer, which makes gradient-based training (Chapter 9) far more reliable in deep networks.</p>
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; LayerNorm on one 4-number vector</span>
+  <p><i>x</i> = (2, 4, 4, 6). Mean = 4. Variance = average of (2&minus;4)<sup>2</sup>, (4&minus;4)<sup>2</sup>, (4&minus;4)<sup>2</sup>, (6&minus;4)<sup>2</sup> = (4+0+0+4)/4 = 2. Standard deviation = &radic;2 &asymp; 1.414. Normalized: ((2&minus;4)/1.414, (4&minus;4)/1.414, (4&minus;4)/1.414, (6&minus;4)/1.414) = (&minus;1.414, 0, 0, 1.414). Every LayerNorm output has mean 0 and standard deviation 1 by construction &mdash; before the network's own learned rescaling is applied on top.</p>
+</div>
+
+<h2>The full Transformer block</h2>
+<div class="formula">z&prime; = z + MHSA(LN(z))<span class="op">,&nbsp;&nbsp;&nbsp;</span>z = z&prime; + MLP(LN(z&prime;))</div>
+<p>Two sub-layers, each wrapped in a <b>residual connection</b> (the "<i>z</i> + &hellip;" pattern): the sub-layer's output is <i>added to</i> the input, rather than replacing it. This matters directly for training deep networks: if a sub-layer's contribution during early training is close to zero, the residual connection guarantees the block still passes its input through essentially unchanged, rather than corrupting it &mdash; gradients (Chapter 3) can flow straight through the "+" unimpeded even when the sub-layer's own gradient is small or noisy. Chapter 24 shows Emergent Attention leans on this same idea deliberately, via zero-initialization, to guarantee it starts training as an exact identity function.</p>
+
+<div class="chap-eyebrow">Chapter 17 &middot; Part IV</div>
+<h1 class="chapter">The Cost of Attention, and Why It Matters</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>Chapter 15's worked example computed one token's output by comparing it against all 3 tokens. For <i>n</i> tokens, every one of the <i>n</i> tokens must be compared against all <i>n</i> tokens (itself included) &mdash; <i>n</i>&times;<i>n</i> comparisons in total. This is exactly the <i>O</i>(<i>n</i><sup>2</sup>) growth from Chapter 5, and it is standard self-attention's defining cost.</p>
+</div>
+<div class="formula">Cost of one MHSA layer &asymp; O(n<sup>2</sup>D)</div>
+<p>At this project's <i>n</i>=196, <i>D</i>=192: roughly 196<sup>2</sup>&times;192 &asymp; 7.37 million multiply-accumulate operations, per attention layer, per image, just for the attention step itself (before the MLP sub-layer). This cost is why Swin-Tiny (Chapter 18) restricts attention to local windows rather than the full image, and it is the exact cost Emergent Attention (Chapter 23) avoids by replacing global comparison with local, iterated computation &mdash; Chapter 25 returns to this comparison with both mechanisms' real operation counts filled in.</p>
+
+<div class="chap-eyebrow">Chapter 18 &middot; Part IV</div>
+<h1 class="chapter">The Baselines: ViT, DeiT, Swin</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>This project doesn't just report Emergent Attention's numbers in isolation &mdash; it compares against three well-established Vision Transformer designs, trained under the exact same recipe (Chapter 10) for a fair comparison. Knowing what distinguishes each one is necessary to read the results tables in Part VIII.</p>
+</div>
+
+<h3>ViT (Vision Transformer)</h3>
+<p>The original design (Dosovitskiy et al., 2021): patch embedding, CLS token, position embeddings, a stack of standard Transformer blocks (Chapter 16), and a classifier reading the final CLS token. ViT proved that a pure-attention architecture, with no convolutions anywhere, could match convolutional networks &mdash; but the original version needed enormous pretraining datasets to get there.</p>
+
+<h3>DeiT (Data-efficient image Transformer)</h3>
+<p>DeiT's original contribution was a training recipe (knowledge distillation from a convolutional teacher network, plus heavy augmentation) that let a ViT-shaped architecture train well on much smaller datasets without that massive pretraining. In this project, "DeiT-Tiny" refers to the architecture configuration DeiT introduced (<i>D</i>=192, depth 12, 3 heads &mdash; the same <i>D</i>=192 this project's own models use, chosen specifically to keep model width comparable) trained from scratch under this project's own recipe (Chapter 10), <i>not</i> DeiT's original distillation procedure &mdash; there is no separate teacher network anywhere in this project. It functions here as the closest architectural sibling to this project's own token count and embedding width, differing only in the token-mixing mechanism (standard MHSA throughout, vs. Emergent Attention for some or all layers).</p>
+
+<h3>Swin Transformer</h3>
+<p>Swin reintroduces locality into attention: instead of every token attending to all 196 others, tokens are grouped into small local windows, and attention is computed only within each window. Layers alternate between two window arrangements ("shifted windows") so that information can still eventually flow across window boundaries over depth, and the grid is periodically downsampled (merging groups of nearby tokens into fewer, wider tokens) as the network gets deeper, mimicking the pyramid structure of classical convolutional networks. Swin-Tiny is substantially larger than the other baselines here (27.60M parameters vs. 5.54M for ViT/DeiT-Tiny), and it is the strongest baseline on clean accuracy in this project's results (Chapter 30).</p>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight</span>
+  <p>Swin already demonstrates that <i>some</i> form of locality helps Vision Transformers &mdash; it just achieves locality through windowing and hierarchy, at a large parameter cost. This project's core question, answered starting in Part VI, is whether a much smaller, non-learned form of locality &mdash; a fixed edge-detection kernel, iterated instead of windowed &mdash; can capture a related benefit at a fraction of the parameter count, and whether that benefit has a precise, checkable shape rather than being a vague "helps a bit, generally."</p>
+</div>
+
+<div class="part-title">
+  <div class="part-num">Part V</div>
+  <div class="part-name">Cellular Automata</div>
+  <div class="part-desc"><p style="text-align:left;">Three chapters on the idea this project imports from a completely different research tradition than Vision Transformers: that repeating a small, local rule across a grid, many times, can produce behavior far more complex than the rule itself &mdash; and that a version of this rule can be learned rather than hand-written.</p></div>
+  <div class="part-chapters">
+    <div>19. Conway's Game of Life: Complexity from a Local Rule</div>
+    <div>20. Neural Cellular Automata: Learning the Local Rule</div>
+    <div>21. Why Iteration Can Substitute for Global Attention</div>
+  </div>
+</div>
+
+<div class="chap-eyebrow">Chapter 19 &middot; Part V</div>
+<h1 class="chapter">Conway's Game of Life: Complexity from a Local Rule</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>A <b>cellular automaton</b> is a grid of cells, each in one of a small number of states, updated all at once, over and over, by a rule that only ever looks at each cell's immediate neighbors. Conway's <b>Game of Life</b> (1970) is the most famous example: every cell is either "alive" or "dead," and the entire rule is three sentences long &mdash; yet it produces gliders, oscillators, and structures complex enough to be, in a formal sense, a general-purpose computer. Nothing in the rule itself is complicated; the complexity comes entirely from applying it everywhere, simultaneously, over many steps.</p>
+</div>
+
+<div class="box defn">
+  <span class="box-lbl">Definition &mdash; the Game of Life rule</span>
+  <p>For every cell, count its living neighbors among the 8 surrounding cells, then: a living cell with 2 or 3 living neighbors stays alive (otherwise it dies); a dead cell with <i>exactly</i> 3 living neighbors becomes alive (otherwise it stays dead). Every cell on the grid applies this same rule at the same time, using only the <i>previous</i> step's neighbor counts.</p>
+</div>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; one step of a "blinker"</span>
+  <p>Three live cells in a row (a well-known Game of Life pattern called a "blinker"), on a small grid (1 = alive, 0 = dead):</p>
+  <div class="pixgrid">
+    <div><table><tr><td>0</td><td>0</td><td>0</td></tr><tr><td class="hl">1</td><td class="hl">1</td><td class="hl">1</td></tr><tr><td>0</td><td>0</td><td>0</td></tr></table><div class="glabel">step 0</div></div>
+    <div><table><tr><td>0</td><td class="hl">1</td><td>0</td></tr><tr><td>0</td><td class="hl">1</td><td>0</td></tr><tr><td>0</td><td class="hl">1</td><td>0</td></tr></table><div class="glabel">step 1</div></div>
+  </div>
+  <p>Check the center cell of the middle row (already alive, neighbors: the two cells beside it are alive, giving 2 live neighbors) &rarr; stays alive. Check the cell directly above center (dead, neighbors: the three cells of the row below sum to 3 live neighbors) &rarr; becomes alive. Apply this to every cell, and the horizontal line becomes a vertical line. One more step flips it back to horizontal &mdash; it oscillates forever, purely from three sentences of local rule, reapplied.</p>
+</div>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight</span>
+  <p>No cell in the Game of Life ever sees more than its 8 immediate neighbors, and no cell ever "knows" the global pattern it's part of. Complex, structured, long-range behavior <i>emerges</i> anyway, purely from repetition. This single observation is the seed the project's name comes from: <b>Emergent</b> Attention &mdash; attention-like, long-range information flow, emerging from a rule that never itself looks further than its own neighborhood.</p>
+</div>
+
+<div class="chap-eyebrow">Chapter 20 &middot; Part V</div>
+<h1 class="chapter">Neural Cellular Automata: Learning the Local Rule</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>The Game of Life's rule was hand-written by a mathematician. A <b>Neural Cellular Automaton (NCA)</b> replaces the hand-written rule with a small neural network (Chapter 6), <i>trained</i> so that repeating it produces some desired outcome. The landmark example, <i>Growing Neural Cellular Automata</i> (Mordvintsev et al., 2020), trains a local rule so that starting from a single "seed" cell and iterating produces an entire target image &mdash; the image literally grows, cell by cell, from nothing, using a rule no more complex per-step than the Game of Life's, just learned instead of designed.</p>
+</div>
+
+<h2>Perception, then update</h2>
+<p>Every NCA step follows the same two-part structure, and it should look immediately familiar &mdash; it's built directly from Parts III and II of this book:</p>
+<ol>
+  <li><b>Perceive</b>: each cell looks at its 3&times;3 neighborhood using a small set of fixed convolution filters (Chapter 11) &mdash; the original Growing NCA work used exactly the Sobel-X and Sobel-Y filters from Chapter 12, plus the cell's own raw value (the Identity filter), the same three filters this project reuses unchanged.</li>
+  <li><b>Update</b>: the perceived values are fed into a small neural network (an MLP, Chapter 6) that outputs a small change, added to the cell's current state. Every cell on the grid runs the <i>same</i> network, with the <i>same</i> weights &mdash; a rule shared identically across every position, exactly like the Game of Life's one rule applying to every cell.</li>
+</ol>
+
+<h2>Stochastic updates</h2>
+<p>Growing NCA introduced one more deliberate ingredient: at each step, only a random subset of cells actually apply their computed update (a Bernoulli(<i>p</i>) gate per cell, Chapter 4) &mdash; the rest sit still for that step, even though they computed an update. This is not an accident or a regularization afterthought; the original paper found that without it, cells naturally fall into perfect lockstep synchronization, which turns out to be a fragile, unrealistic assumption (real biological growth, which the technique is loosely inspired by, is never perfectly synchronized across cells) and produces less stable, less self-repairing growth patterns.</p>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight &mdash; self-repair</span>
+  <p>A striking property of trained Growing NCA models: if part of the grown image is deleted mid-training-run or after training, the surviving cells' local rule &mdash; run purely from local neighbor information, with no global "look at the whole picture" step anywhere &mdash; regrows the missing region. No cell was ever explicitly trained to "notice damage"; the same local update rule that grows the image from a seed also happens to repair it, because damaged regions look locally similar to early-growth regions the rule already knows how to handle. This project's later robustness results (Part VIII) are, in spirit, the same phenomenon applied to noise instead of physical deletion: a mechanism built from local, iterated correction turns out to resist a class of input corruption it was never explicitly trained against.</p>
+</div>
+
+<div class="chap-eyebrow">Chapter 21 &middot; Part V</div>
+<h1 class="chapter">Why Iteration Can Substitute for Global Attention</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>Three ideas from the last three parts of this book now combine into the project's actual research question. Self-attention (Chapter 15) gives every token global reach in one step, at <i>O</i>(<i>n</i><sup>2</sup>) cost (Chapter 17). A single convolution (Chapter 11) gives every position only local reach, but stacking or iterating it grows that reach linearly (Chapter 13), at <i>O</i>(<i>n</i>) cost per step. A Neural Cellular Automaton (Chapter 20) is exactly this iterated local computation, with a <i>learned</i> update rule, and demonstrated properties &mdash; like self-repair &mdash; that come specifically from being local and iterated rather than global and single-shot.</p>
+</div>
+
+<p>Put together, these three facts suggest a genuine, testable question, rather than just an analogy: if you replace a Transformer's global attention layer with enough iterations of a local NCA-style rule, does the network still work &mdash; and if it does, does it inherit any of the NCA-family's characteristic robustness properties, in a form precise enough to predict, not just observe after the fact?</p>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight &mdash; how this differs from simply "combining" NCA and attention</span>
+  <p>Prior work had already combined these two ideas, but always by keeping attention as the primary mechanism and adding NCA around it &mdash; NCA blocks <i>inserted between</i> attention layers (AdaNCA, 2024), or attention <i>fused into</i> the NCA update rule itself (ViTCA, 2022). Neither removes attention. This project's method, covered starting next chapter, asks the more direct version of the question: not "does adding some NCA help attention," but "can iterated local NCA dynamics <i>fully replace</i> global attention as the token mixer" &mdash; and if the resulting model is measurably different in its robustness behavior, can that difference be predicted in advance, rather than just measured after training and reported as a number.</p>
+</div>
+
+<div class="part-title">
+  <div class="part-num">Part VI</div>
+  <div class="part-name">Emergent Attention: This Project's Method</div>
+  <div class="part-desc"><p style="text-align:left;">Everything up to this point has been standard, published machinery. This part is the project's actual contribution: a full, worked-numeric walkthrough of the mechanism itself, then a defense of every non-obvious design choice inside it, one at a time.</p></div>
+  <div class="part-chapters">
+    <div>22. The Idea, in One Paragraph</div>
+    <div>23. The Full Mechanism, Worked Numerically</div>
+    <div>24. Four Design Decisions, and Why Each Was Made</div>
+    <div>25. Complexity, With Real Project Numbers</div>
+  </div>
+</div>
+
+<div class="chap-eyebrow">Chapter 22 &middot; Part VI</div>
+<h1 class="chapter">The Idea, in One Paragraph</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition &mdash; no formulas at all</span>
+  <p>Take a standard Vision Transformer block (Chapter 16) and delete its self-attention step. In its place, put a Neural Cellular Automaton (Chapter 20): every patch looks at its 8 immediate neighbors using two fixed edge-detecting filters plus a raw-value filter (Chapter 12), feeds what it sees into one small shared neural network (Chapter 6), and nudges its own value slightly based on the result &mdash; but only if a coin flip (Chapter 4) for that specific cell, this specific step, comes up in its favor. Do this four times in a row, each time using the <i>updated</i> grid from the step before, so information can spread outward one neighborhood at a time (Chapter 13). After four rounds, add up everything that changed and hand it to the rest of the network, exactly the way a standard attention block's output gets added back (Chapter 16). Do this for the first half of the network's layers; use ordinary global attention (Chapter 15) for the second half. That whole paragraph is <b>Hybrid NCA-ViT</b> &mdash; the project's main architecture.</p>
+</div>
+
+<p>The rest of this part makes every sentence above precise: exact shapes, exact formulas, one full worked numeric pass through the mechanism, and a justification for each of the four non-obvious choices (fixed filters, zero-init, coin-flip gating, and never letting the CLS token join in).</p>
+
+<div class="chap-eyebrow">Chapter 23 &middot; Part VI</div>
+<h1 class="chapter">The Full Mechanism, Worked Numerically</h1>
+
+<p>This chapter builds the exact computation from the paper (its Section&nbsp;3.2), formula by formula, with a complete hand-computable numeric example threaded through every step. The real network uses <i>D</i>=192 channels; the worked example below uses <i>D</i>=1 (a single scalar value per patch, like a tiny brightness map) purely so every number can be checked by hand &mdash; the arithmetic is identical either way, just repeated 192&times; more in the real network.</p>
+
+<h2>Step 0 &mdash; the sequence, and the grid</h2>
+<p>The token sequence <i>z</i> holds the CLS token at index 0 and the patch tokens at indices 1..<i>n</i>. Formally <i>z</i> &isin; &#8477;<sup><i>B</i>&times;(1+<i>n</i>)&times;<i>D</i></sup> (<i>B</i>=batch size, Chapter 10). <b>The CLS token is set aside immediately and never touched by the steps below</b> &mdash; Chapter 24 explains why. The remaining <i>n</i> patch tokens are LayerNormed (Chapter 16) and reshaped from a flat list back into their original <i>H<sub>p</sub></i>&times;<i>W<sub>p</sub></i> grid (14&times;14 in the real network; a 3&times;3 toy grid below):</p>
+<div class="formula">s<sub>0</sub> = rearrange( LN(p),&nbsp; "b (h<sub>p</sub> w<sub>p</sub>) d &rarr; b d h<sub>p</sub> w<sub>p</sub>" )</div>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; the toy grid</span>
+  <p>A 3&times;3 grid of single-channel patch values (a small bright spot in the center, flat elsewhere &mdash; think of it as one channel of one real feature map, already past LayerNorm):</p>
+  <div class="pixgrid">
+    <div><table><tr><td>1</td><td>2</td><td>1</td></tr><tr><td>1</td><td class="hl">5</td><td>1</td></tr><tr><td>1</td><td>2</td><td>1</td></tr></table><div class="glabel">s<sub>0</sub>, the starting grid</div></div>
+  </div>
+  <p>We'll trace what happens to the highlighted center cell during one full iteration.</p>
+</div>
+
+<h2>Step 1 &mdash; Perception</h2>
+<p>A fixed, depthwise 3&times;3 convolution (Chapter 11, Chapter 12) applies <i>M</i>=3 filters &mdash; Sobel-X, Sobel-Y, Identity &mdash; independently to each channel, producing perc &isin; &#8477;<sup><i>B</i>&times;<i>DM</i>&times;<i>H<sub>p</sub></i>&times;<i>W<sub>p</sub></i></sup>. These filters are frozen (<code>learnable_filters=False</code> by default) &mdash; no gradient ever updates them.</p>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; perceiving the center cell</span>
+  <p>The center cell's 3&times;3 neighborhood <i>is</i> the whole toy grid. Apply each filter (Chapter 12's exact worked-example procedure):</p>
+  <p><b>Sobel-X</b>: (&minus;1&times;1)+(0&times;2)+(1&times;1) + (&minus;2&times;1)+(0&times;5)+(2&times;1) + (&minus;1&times;1)+(0&times;2)+(1&times;1) = 0 + 0 + 0 = <b>0</b>.</p>
+  <p><b>Sobel-Y</b>: (&minus;1&times;1)+(&minus;2&times;2)+(&minus;1&times;1) + 0 + (1&times;1)+(2&times;2)+(1&times;1) = &minus;6 + 0 + 6 = <b>0</b>.</p>
+  <p><b>Identity</b>: just the center value itself = <b>5</b>.</p>
+  <p>perc<sub>center</sub> = (0, 0, 5). Both edge detectors report exactly zero &mdash; and this is not a coincidence of round numbers: the bright spot is perfectly symmetric left-right and top-bottom, and (Chapter 3) <i>the exact peak of a symmetric bump always has zero slope in every direction</i>. Only the Identity channel carries any information forward at this exact cell, correctly reporting "you're bright" without claiming any particular direction of change &mdash; because, at this precise point, there isn't one.</p>
+</div>
+
+<h2>Step 2 &mdash; the Update MLP</h2>
+<p>The perception output, at every cell, is fed into one small MLP (Chapter 6, Chapter 7) shared identically across all cells:</p>
+<div class="formula">h = ReLU(W<sub>1</sub>&middot;perc + b<sub>1</sub>),&nbsp;&nbsp;&nbsp; &delta; = W<sub>2</sub>&middot;h + b<sub>2</sub></div>
+<p>In the real network, <i>W</i><sub>1</sub> maps 576 (=<i>DM</i>=192&times;3) inputs to 384 hidden units, and <i>W</i><sub>2</sub> maps those 384 back down to <i>D</i>=192. The toy example below uses a 3-input, 2-hidden, 1-output version of the same shapes.</p>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; the update MLP, at initialization and later in training</span>
+  <p>Toy weights (illustrative &mdash; not the project's real trained values, chosen only to be hand-checkable):</p>
+  <p><i>W</i><sub>1</sub> = [[1, 0, 1], [0, 1, &minus;1]], <i>b</i><sub>1</sub> = (0, 0). Applied to perc<sub>center</sub> = (0, 0, 5):</p>
+  <p>row 1: 1&times;0 + 0&times;0 + 1&times;5 = 5.&nbsp;&nbsp; row 2: 0&times;0 + 1&times;0 + (&minus;1)&times;5 = &minus;5.</p>
+  <p><i>h</i> = ReLU((5, &minus;5)) = <b>(5, 0)</b> &mdash; the negative entry is clamped to zero (Chapter 7).</p>
+  <p><b>At initialization</b>, <i>W</i><sub>2</sub> and <i>b</i><sub>2</sub> are set to exactly zero (this is deliberate &mdash; Chapter 24 explains why): &delta; = 0&times;5 + 0&times;0 + 0 = <b>0</b>. No matter what perception computed, the update at this cell is exactly zero at the start of training.</p>
+  <p><b>Later in training</b>, once <i>W</i><sub>2</sub>, <i>b</i><sub>2</sub> have moved away from zero &mdash; say <i>W</i><sub>2</sub> = (0.3, 0.1), <i>b</i><sub>2</sub>=0 (again illustrative): &delta; = 0.3&times;5 + 0.1&times;0 + 0 = <b>1.5</b>. The center cell now has a nonzero proposed update.</p>
+</div>
+
+<h2>Step 3 &mdash; the stochastic gate</h2>
+<div class="formula">
+  s<sub>t+1</sub> = s<sub>t</sub> + m<sub>t</sub> &odot; &delta;<sub>t</sub>,&nbsp; m<sub>t</sub> &sim; Bernoulli(p)&nbsp; <span class="op">(training)</span><br>
+  s<sub>t+1</sub> = s<sub>t</sub> + &delta;<sub>t</sub>&nbsp; <span class="op">(inference)</span>
+</div>
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; the coin flip, p=0.5</span>
+  <p>During training, before the update above is applied, each cell independently draws <i>m</i> &sim; Bernoulli(0.5) (Chapter 4). <b>If m=1</b> (heads): the center cell's new value is 5 + 1&times;1.5 = <b>6.5</b>. <b>If m=0</b> (tails): the update is skipped entirely for this cell, this step: the center cell stays at <b>5</b>, even though &delta; was computed and was nonzero. At evaluation/inference time, the coin flip is removed entirely and every cell always updates &mdash; the stochasticity is a <i>training-time</i> stabilization technique (Chapter 20), not part of the deployed model's behavior.</p>
+</div>
+
+<h2>Step 4 &mdash; iterate, then output</h2>
+<p>Steps 1&ndash;3 repeat <i>K</i>=4 times total, each time operating on the <i>updated</i> grid from the previous iteration &mdash; so on iteration 2, the center cell's neighbors (which received no direct update on iteration 1, since their own local neighborhoods differed) begin to feel the center cell's change through <i>their own</i> perception step, and the disturbance spreads outward exactly as Chapter 13's receptive-field argument predicts: one ring of neighbors per iteration, reaching a 9&times;9-patch region after all <i>K</i>=4 iterations. After the last iteration, the total accumulated change is handed back to the residual stream, with a zero delta reinserted for the CLS token that was set aside in Step 0:</p>
+<div class="formula">&Delta; = s<sub>K</sub> &minus; s<sub>0</sub>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; z &larr; z + DropPath( [0<sub>CLS</sub> ; &Delta;] )</div>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight</span>
+  <p>Every formula above is built entirely from Parts I&ndash;III of this book: a convolution (Chapter 11) using two hand-designed filters (Chapter 12), feeding a two-layer MLP (Chapter 6) with a ReLU (Chapter 7), gated by a coin flip (Chapter 4), added back through a residual connection (Chapter 16), repeated a fixed number of times to grow its reach (Chapter 13). Nothing about Emergent Attention required inventing a new mathematical operation &mdash; the contribution is entirely in <i>which</i> well-understood pieces were assembled, in what order, and with which parts deliberately left un-learned. That specific assembly is what Chapter 24 defends, piece by piece.</p>
+</div>
+
+<div class="chap-eyebrow">Chapter 24 &middot; Part VI</div>
+<h1 class="chapter">Four Design Decisions, and Why Each Was Made</h1>
+
+<h2>1. Why are the perception filters fixed, not learned?</h2>
+<p>A standard convolution layer <i>learns</i> its filters from data. This project deliberately freezes them at the classic Sobel-X/Sobel-Y/Identity values (Chapter 12) instead, for three reasons: <b>(a)</b> it guarantees the network has a known, interpretable, edge-and-value-detecting inductive bias from the very first training step, regardless of how training goes; <b>(b)</b> every model in this project trains entirely from random initialization, with no large-scale pretraining (Chapter 10) &mdash; removing these parameters from the pool of things that must be learned from a relatively small dataset (50,000 CIFAR-100 images, or as few as 625 for BUSI, Chapter 37) is a direct sample-efficiency argument; <b>(c)</b> the codebase does include an optional flag to unfreeze them, but no headline result in the paper uses it &mdash; that experiment is future work, reported honestly as not yet run rather than implied to have been tried and confirmed unnecessary.</p>
+
+<h2>2. Why is the update MLP's output layer zero-initialized?</h2>
+<p>Recall from Chapter 23: with <i>W</i><sub>2</sub>, <i>b</i><sub>2</sub> = 0, the block computes &delta;&equiv;0 for every cell, meaning the entire Emergent Attention block is an <b>exact identity function</b> at the start of training &mdash; it changes nothing, no matter the input. This connects directly to Chapter 16's residual-connection discussion: a freshly-initialized, <i>non</i>-zero sub-layer inserted into a deep residual network can inject large, essentially random perturbations into a signal that the rest of the (also freshly-initialized) network hasn't learned to handle yet, which can destabilize early training or require a careful warm-up schedule to avoid. Zero-initializing the output projection sidesteps the problem entirely: training begins as if the NCA blocks were transparent, and they only gradually begin contributing as <i>W</i><sub>2</sub> moves away from zero under gradient descent (Chapter 9) &mdash; no NCA-specific warm-up schedule is needed anywhere in the training recipe (Chapter 10).</p>
+
+<h2>3. Why gate updates with a coin flip instead of always updating?</h2>
+<p>This is inherited directly from Growing NCA's stabilization practice (Chapter 20): always-synchronous updates encourage the network to rely on every cell updating in perfect lockstep, a fragile assumption. Stochastic gating (Chapter 4) breaks that reliance during training, and empirically NCA-family models trained this way exhibit better stability and the self-repair property discussed in Chapter 20. It also has a side effect familiar from a different, well-known regularization technique: like Dropout (which randomly zeroes out whole neurons during training to prevent over-reliance on any single one), randomly skipping a cell's update forces the surrounding cells' rule to remain informative even when any individual neighbor might sit out a given step &mdash; discouraging brittle dependence on any one specific update actually landing.</p>
+
+<h2>4. Why is the CLS token never allowed to join the NCA grid?</h2>
+<p>The entire justification for calling this rule "local and shared" &mdash; the same justification that makes the receptive-field argument (Chapter 13) and the Big-O argument (Chapter 17, Chapter 25) valid at all &mdash; rests on every cell obeying the identical rule, operating on a well-defined spatial neighborhood. The CLS token (Chapter 14) has no spatial position; it doesn't correspond to any patch of the image. Letting it participate would force an arbitrary choice (what is its "neighborhood"?) and would risk turning it into a special-cased shortcut &mdash; an information sink that quietly breaks the "identical rule, everywhere" property the whole mechanism depends on. The block instead returns an explicit zero delta for CLS at every NCA layer (visible directly in Step 4 of Chapter 23's worked example), and Chapter 14 already covered the practical consequence: since CLS never receives image-dependent information while passing through any NCA block, the Hybrid and Pure NCA-ViT models classify using global-average-pooled patch tokens (Chapter 14) instead of reading CLS.</p>
+
+<div class="chap-eyebrow">Chapter 25 &middot; Part VI</div>
+<h1 class="chapter">Complexity, With Real Project Numbers</h1>
+
+<p>Chapter 17 established that standard attention costs <i>O</i>(<i>n</i><sup>2</sup><i>D</i>). Emergent Attention's cost is dominated by its update MLP, run <i>K</i> times:</p>
+
+<table class="datatable">
+  <caption><b>Table.</b> Asymptotic cost, Section 3.4 of the paper.</caption>
+  <thead><tr><th>Component</th><th>Complexity</th></tr></thead>
+  <tbody>
+    <tr><td>Standard MHSA (Chapter 15&ndash;17)</td><td>O(n<sup>2</sup>D)</td></tr>
+    <tr><td>Emergent Attention update MLP</td><td>O(KnD<sup>2</sup>) &mdash; MLP-dominated</td></tr>
+    <tr><td>Perception convolution</td><td>O(KnDMk<sup>2</sup>), k=3</td></tr>
+  </tbody>
+</table>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; the asymptotic shapes, at this project's real n</span>
+  <p>At <i>n</i>=196 (Chapter 1), <b>MHSA's cost grows with <i>n</i><sup>2</sup> = 38,416</b>; <b>Emergent Attention's cost grows with <i>n</i> = 196</b> &mdash; a 196&times; difference in how the two mechanisms' cost would scale if the image were cut into more, smaller patches. This is a genuine, correct theoretical advantage: Emergent Attention is <b>linear</b> in the number of tokens, standard attention is <b>quadratic</b>.</p>
+</div>
+
+<div class="box pitfall">
+  <span class="box-lbl">Pitfall &mdash; Big-O hides constant factors, and they matter here</span>
+  <p>Chapter 5 already flagged this: Big-O notation deliberately ignores multiplicative constants, and those constants are not always small. Emergent Attention's per-iteration cost carries hidden factors of <i>M</i>=3 (three perception filters) and the update MLP's hidden width (384, i.e. 2<i>D</i>), repeated <i>K</i>=4 times &mdash; so the <i>actual</i> operation count is substantially larger than the bare shape "linear in <i>n</i>" suggests, even though the scaling behavior as <i>n</i> grows really is linear. And measured wall-clock speed depends on more than raw operation count: standard attention has had roughly a decade of dedicated, heavily-optimized GPU kernel engineering behind it (fused, hardware-specific implementations), while a <i>K</i>-iteration loop of small depthwise convolutions plus a small MLP has no equivalent fused kernel in this project's implementation. The measured result reflects this honestly:</p>
+</div>
+
+<table class="datatable">
+  <caption><b>Table.</b> Measured throughput, RTX 4060, uncontended (Table 1 of the paper).</caption>
+  <thead><tr><th>Model</th><th>Params (M)</th><th>GFLOPs</th><th>Images/sec</th></tr></thead>
+  <tbody>
+    <tr><td>DeiT-Tiny</td><td>5.54</td><td>1.08</td><td>1672</td></tr>
+    <tr><td>Swin-Tiny</td><td>27.60</td><td>4.51</td><td>337</td></tr>
+    <tr class="hl"><td>Hybrid NCA-ViT</td><td>6.46</td><td>2.41</td><td>585</td></tr>
+  </tbody>
+</table>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight</span>
+  <p>Hybrid NCA-ViT is about 2.2&times; DeiT-Tiny's FLOPs and roughly 2.9&times; slower in measured throughput &mdash; it is <i>not</i> faster than plain attention on this project's current, unoptimized implementation, despite the correct linear-vs-quadratic asymptotic argument above. This is reported plainly as an honest limitation (revisited in Chapter 40), not minimized or hidden: the theoretical complexity argument for locality is real, but a fused kernel for the <i>K</i>-iteration loop does not yet exist in this codebase, so the practical speed advantage that argument predicts has not yet been realized. The two facts &mdash; "asymptotically linear" and "currently slower in wall-clock terms" &mdash; are both true at once, and Chapter 5's Big-O caveat is exactly why they don't contradict each other.</p>
+</div>
+
+<div class="part-title">
+  <div class="part-num">Part VII</div>
+  <div class="part-name">The Architectures Built</div>
+  <div class="part-desc"><p style="text-align:left;">Two networks were actually built and trained around Emergent Attention: a hybrid that mixes it with standard attention, and a pure version that uses nothing else. This part covers both, plus a worked example counting exactly where a real model's parameters live.</p></div>
+  <div class="part-chapters">
+    <div>26. Hybrid NCA-ViT</div>
+    <div>27. Pure NCA-ViT and the Other Baselines</div>
+    <div>28. Counting Parameters, Worked Example</div>
+  </div>
+</div>
+
+<div class="chap-eyebrow">Chapter 26 &middot; Part VII</div>
+<h1 class="chapter">Hybrid NCA-ViT</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>This is the project's main architecture, and the one Chapter 22's one-paragraph summary describes: the first half of a 12-block network uses Emergent Attention, the second half uses standard multi-head self-attention. Everything about it &mdash; patch embedding, position embeddings, the CLS token that gets carried along but never read &mdash; is built entirely from pieces this book has already covered.</p>
+</div>
+
+<p>The full pipeline, in order: an image is cut into 196 patches and linearly embedded to <i>D</i>=192 (Chapter 14); a CLS token and position embeddings are added; the sequence passes through <i>L<sub>N</sub></i>=6 Emergent Attention blocks (Chapter 23, each with <i>K</i>=4 iterations, hidden width 384); then through <i>L<sub>A</sub></i>=6 standard Transformer blocks (Chapter 16, 3 attention heads); finally, the 196 patch tokens (not CLS &mdash; Chapter 24, reason 4) are averaged together (global average pooling, Chapter 14) and passed to a small classifier head. Total: <b>6.46 million parameters</b>.</p>
+
+<figure>
+  <img src="{{IMG:architecture}}">
+  <figcaption><b>Figure.</b> (a) The full Hybrid NCA-ViT pipeline &mdash; six Emergent Attention blocks (local, fixed perception) followed by six standard MHSA blocks (global), pooled and classified via GAP over patch tokens. (b) One NCA iteration end-to-end: three fixed depthwise kernels &rarr; shared update MLP with zero-initialized output &rarr; Bernoulli-gated additive update, repeated K=4 times &mdash; the exact sequence worked through numerically in Chapter 23.</figcaption>
+</figure>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight &mdash; why this specific ordering, early-NCA then late-attention?</span>
+  <p>The intuition (defended empirically in Chapter 31's ablation, not just asserted here) is a division of labor: early layers work on low-level, still-local image structure &mdash; edges, textures, small patterns &mdash; exactly the regime local, iterated computation (Part III, Part V) is naturally suited to. Late layers work on already-abstracted, semantic, class-relevant features, where directly comparing distant parts of the image in one step (global attention, Chapter 15) is more valuable than continuing to refine local neighborhoods. The architecture doesn't <i>assume</i> this division is correct; Chapter 31 tests it directly by trying every other split.</p>
+</div>
+
+<div class="chap-eyebrow">Chapter 27 &middot; Part VII</div>
+<h1 class="chapter">Pure NCA-ViT and the Other Baselines</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>To know whether a result comes from the NCA mechanism itself, it helps to have a version of the network that uses <i>only</i> that mechanism, with attention removed entirely, as a clean point of comparison.</p>
+</div>
+
+<p><b>Pure NCA-ViT</b> replaces all 12 blocks with Emergent Attention &mdash; no standard attention layer anywhere in the network. Total: 7.31 million parameters, and it reaches 73.99% clean top-1 accuracy on CIFAR-100 (Chapter 30), 7.9 points below the Hybrid model. On its own, that gap might just mean "attention is better" &mdash; but Pure NCA-ViT plays a specific, deliberate role later in this book, in two places: Chapter 31's depth-ordering ablation includes it as the "0 attention" endpoint of the full spectrum from all-attention to all-NCA, and Chapter 34's mechanism analysis uses the gap between Pure NCA-ViT and the Hybrid model's corruption-robustness numbers to help attribute <i>which part</i> of the network's behavior is coming from the NCA component specifically, rather than from the network being different in some other, unrelated way.</p>
+
+<p>Alongside these two project-built networks, three established architectures serve as baselines &mdash; already introduced in Chapter 18 (ViT-Tiny, DeiT-Tiny, Swin-Tiny), trained under the identical recipe from Chapter 10, with no changes to any setting except the model itself. Five architectures total appear in every results table from here on:</p>
+
+<table class="datatable">
+  <caption><b>Table.</b> All five architectures compared in this project.</caption>
+  <thead><tr><th>Model</th><th>Token mixer</th><th>Params (M)</th><th>Introduced in</th></tr></thead>
+  <tbody>
+    <tr><td>ViT-Tiny</td><td>Standard attention, every layer</td><td>5.54</td><td>Chapter 18</td></tr>
+    <tr><td>DeiT-Tiny</td><td>Standard attention, every layer</td><td>5.54</td><td>Chapter 18</td></tr>
+    <tr><td>Swin-Tiny</td><td>Windowed local attention + hierarchy</td><td>27.60</td><td>Chapter 18</td></tr>
+    <tr><td>Pure NCA-ViT</td><td>Emergent Attention, every layer</td><td>7.31</td><td>this chapter</td></tr>
+    <tr class="hl"><td>Hybrid NCA-ViT</td><td>Emergent Attention (early) + standard attention (late)</td><td>6.46</td><td>Chapter 26</td></tr>
+  </tbody>
+</table>
+
+<div class="chap-eyebrow">Chapter 28 &middot; Part VII</div>
+<h1 class="chapter">Counting Parameters, Worked Example</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>"6.46 million parameters" is not a number read off a dashboard &mdash; it's the sum of every weight and bias in every matrix in the network (Chapter 2, Chapter 6). This chapter counts, by hand, exactly how many of those parameters live inside a single Emergent Attention block's update MLP, using the project's real dimensions.</p>
+</div>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; parameters inside one NCA block</span>
+  <p>Recall from Chapter 23: <i>D</i>=192, <i>M</i>=3 filters, so the perception output has <i>DM</i>=576 dimensions; the update MLP's hidden width is 384.</p>
+  <table><tr><th>Component</th><th>Shape</th><th>Weight count</th><th>Bias count</th><th>Total</th></tr>
+  <tr><td>LayerNorm</td><td>D=192</td><td>&mdash;</td><td>&mdash;</td><td>384 <span style="font-family:'Segoe UI',sans-serif;font-size:8pt;color:#7a7263;">(scale + shift per channel)</span></td></tr>
+  <tr><td>Linear 1 (perc &rarr; hidden)</td><td>576 &rarr; 384</td><td>576&times;384 = 221,184</td><td>384</td><td>221,568</td></tr>
+  <tr><td>Linear 2 (hidden &rarr; D)</td><td>384 &rarr; 192</td><td>384&times;192 = 73,728</td><td>192</td><td>73,920</td></tr>
+  <tr class="hl"><td colspan="4">Total, one NCA block</td><td>295,872</td></tr></table>
+  <p>The Hybrid model has six such blocks: 6&times;295,872 = <b>1,775,232</b> parameters, out of the model's total 6.46 million &mdash; <b>about 27.5%</b> of every trainable number in the entire Hybrid NCA-ViT network lives inside just these six small, shared, per-cell update rules. (The perception filters themselves &mdash; the Sobel-X/Sobel-Y/Identity kernels &mdash; contribute <i>zero</i> to this count: they're frozen constants, not trainable parameters, exactly as Chapter 24 explained.) The remaining parameters are split across the patch embedding, the six standard attention blocks (Chapter 16, each considerably larger per-block than an NCA block, owing to the query/key/value projections plus a wider feed-forward MLP), and the small classifier head.</p>
+</div>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight</span>
+  <p>This kind of accounting is exactly what "6.46M parameters" and "4.3&times; fewer parameters than Swin-Tiny" (Chapter 30) mean concretely &mdash; not an abstract size label, but a literal sum you can reconstruct, matrix by matrix, using nothing beyond Chapter 2's definition of a linear layer.</p>
+</div>
+
+<div class="part-title">
+  <div class="part-num">Part VIII</div>
+  <div class="part-name">The Experiments, One by One</div>
+  <div class="part-desc"><p style="text-align:left;">Every experiment run in this project, in roughly the order it was run, including the two places a genuine mistake was caught and fixed mid-project. Nothing here is summarized away &mdash; every table in the paper appears in this part, with the reasoning behind why it was measured this specific way.</p></div>
+  <div class="part-chapters">
+    <div>29. CIFAR-100 and "Top-1 Accuracy"</div>
+    <div>30. Reading the Main Results Table</div>
+    <div>31. Ablation: The Depth-Ordering Experiment</div>
+    <div>32. Adversarial Robustness: FGSM and PGD</div>
+    <div>33. Corruption Robustness: CIFAR-100-C</div>
+    <div>34. Mechanism Verification: Representation Drift</div>
+    <div>35. Case Study &mdash; the Bug in the Drift Measurement</div>
+    <div>36. Grad-CAM: Seeing What the Network Looks At</div>
+    <div>37. Real-World Validation: BUSI Breast Ultrasound</div>
+    <div>38. Emergent Receptive Field, Measured</div>
+  </div>
+</div>
+
+<div class="chap-eyebrow">Chapter 29 &middot; Part VIII</div>
+<h1 class="chapter">CIFAR-100 and "Top-1 Accuracy"</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>Before any robustness question can be asked, a network first has to be shown to actually work: trained to classify ordinary, uncorrupted images correctly. <b>CIFAR-100</b> is the dataset used for this &mdash; 50,000 training images and 10,000 test images, spread across 100 object categories, small enough to train many models from scratch on a single workstation GPU, which matters because every model in this project (Chapter 10) is trained from random initialization, with no large-scale pretraining to fall back on.</p>
+</div>
+
+<p>CIFAR-100's native images are only 32&times;32 pixels; this project bicubically upsamples them to 224&times;224 to match the patch-embedding pipeline (Chapter 14, 16&times;16 patches &times; 14&times;14 grid). It's important to be precise about what upsampling does and doesn't do: it does <i>not</i> add any real information the camera didn't originally capture &mdash; it stretches the existing 32&times;32 pixels smoothly across a larger canvas. The resulting images are genuinely lower-detail than a native 224&times;224 photograph would be; this is a known property of the setup, not a hidden flaw, and it applies identically to every one of the five architectures compared, so it doesn't advantage or disadvantage any of them relative to the others.</p>
+
+<h2>Top-1 and Top-5 accuracy</h2>
+<p>For each test image, the network outputs a probability (via softmax, Chapter 7) for all 100 classes. <b>Top-1 accuracy</b> is the fraction of test images where the single highest-probability class is the correct one. <b>Top-5 accuracy</b> is more forgiving: the fraction of images where the correct class appears anywhere among the network's 5 highest-probability guesses.</p>
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; top-1 vs. top-5, one image</span>
+  <p>True label: "otter." Network's top 5 guesses, ranked: (1) beaver, (2) otter, (3) seal, (4) mink, (5) platypus. This image counts as <b>wrong</b> for top-1 accuracy (the top guess was "beaver," not "otter") but <b>correct</b> for top-5 accuracy (the true label appears in the ranked list, at position 2). Top-5 accuracy is always &ge; top-1 accuracy for the same model, and the gap between them is informative on its own: a large gap suggests the network is often "nearly right" &mdash; confusing visually or semantically similar classes &mdash; rather than making wild, unrelated errors.</p>
+</div>
+
+<div class="chap-eyebrow">Chapter 30 &middot; Part VIII</div>
+<h1 class="chapter">Reading the Main Results Table</h1>
+
+<table class="datatable">
+  <caption><b>Table 1</b> (paper &sect;5.1). Main result, CIFAR-100, identical training recipe (Chapter 10) for all five models.</caption>
+  <thead><tr><th>Model</th><th>Params (M)</th><th>GFLOPs</th><th>Top-1 (%)</th><th>Top-5 (%)</th><th>Img/s</th></tr></thead>
+  <tbody>
+    <tr><td>ViT-Tiny</td><td>5.54</td><td>1.08</td><td>72.32</td><td>91.16</td><td>1662</td></tr>
+    <tr><td>DeiT-Tiny</td><td>5.54</td><td>1.08</td><td>72.89</td><td>91.34</td><td>1672</td></tr>
+    <tr><td>Pure NCA-ViT (12:0)</td><td>7.31</td><td>3.55</td><td>73.99</td><td>93.32</td><td>427</td></tr>
+    <tr><td>Swin-Tiny</td><td>27.60</td><td>4.51</td><td>81.56</td><td>94.83</td><td>337</td></tr>
+    <tr class="hl"><td>Hybrid NCA-ViT (6:6)</td><td>6.46</td><td>2.41</td><td>81.91</td><td>95.66</td><td>585</td></tr>
+  </tbody>
+</table>
+
+<p>A <b>GFLOP</b> is one billion FLOPs &mdash; "floating point operations," meaning individual adds or multiplies (Chapter 1's dot product, run at scale, is built from millions of individual FLOPs). It's a hardware-independent way to state how much arithmetic one forward pass through the network requires, complementing the parameter count (Chapter 28, "how many numbers the network stores") with "how much work processing one image actually takes."</p>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight &mdash; reading this table honestly</span>
+  <p>Hybrid NCA-ViT matches Swin-Tiny's accuracy (81.91 vs. 81.56) using 4.3&times; fewer parameters and about half the FLOPs &mdash; a genuinely strong result. But it is <i>not</i> cheaper than everything: at 2.41 GFLOPs it costs about 2.2&times; DeiT-Tiny's FLOPs, and DeiT remains the clear throughput leader (Chapter 25). The honest summary is "Swin-competitive at a fraction of Swin's size," not "faster or cheaper than every baseline" &mdash; and the paper states it exactly this way rather than the more flattering but inaccurate version.</p>
+</div>
+
+<div class="box pitfall">
+  <span class="box-lbl">Pitfall &mdash; two numbers for the same model</span>
+  <p>The paper reports Hybrid NCA-ViT's top-1 accuracy as 81.91% with a footnote: a separate evaluation path (the number automatically tracked during training itself, reading the EMA-smoothed weights, Chapter 10) reports 81.29% instead &mdash; a 0.62-point difference, traced to slightly different batch-composition handling between the two evaluation code paths under mixed-precision (Chapter 10). Rather than quietly reporting only the higher, more favorable number, the paper states both and notes explicitly that no conclusion anywhere in the paper depends on which of the two is used. This is a small methodological detail, included here specifically because reporting an unfavorable-looking discrepancy honestly, rather than hiding it, is itself part of what makes a result trustworthy.</p>
+</div>
+
+<div class="chap-eyebrow">Chapter 31 &middot; Part VIII</div>
+<h1 class="chapter">Ablation: The Depth-Ordering Experiment</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>An <b>ablation study</b> deliberately varies exactly one factor, holding everything else in the recipe fixed (Chapter 10's identical-recipe discipline), specifically to find out whether that one factor is actually responsible for a result &mdash; as opposed to some other, unexamined difference between models. Here, the factor under test is the specific "6 NCA blocks, then 6 attention blocks" split (Chapter 26): is 6:6 actually a meaningfully better ordering, or would roughly any mix of the two mechanisms have worked about as well?</p>
+</div>
+
+<table class="datatable">
+  <caption><b>Table</b> (paper &sect;5.2). Every NCA:Attention split, two independent seeds.</caption>
+  <thead><tr><th>NCA : Attention split</th><th>Seed 42 (%)</th><th>Seed 123 (%)</th></tr></thead>
+  <tbody>
+    <tr><td>0 : 12 (pure attention)</td><td>76.33</td><td>77.04</td></tr>
+    <tr><td>3 : 9</td><td>80.92</td><td>81.26</td></tr>
+    <tr class="hl"><td>6 : 6 (Hybrid)</td><td>81.29&ndash;81.91</td><td>81.59</td></tr>
+    <tr><td>9 : 3</td><td>80.69</td><td>81.19</td></tr>
+    <tr><td>12 : 0 (pure NCA)</td><td>73.99</td><td>73.52</td></tr>
+  </tbody>
+</table>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; why the <i>shape</i> of this table is the actual evidence</span>
+  <p>Two very different results could both look like "NCA blocks help": Compare two hypothetical patterns against what was actually found.</p>
+  <table><tr><th>Split</th><th>Hypothetical A: monotonic</th><th>Hypothetical B: peaked</th><th>Actual result (seed 42)</th></tr>
+  <tr><td>0:12</td><td>75.0</td><td>75.0</td><td>76.33</td></tr>
+  <tr><td>3:9</td><td>77.0</td><td>79.0</td><td>80.92</td></tr>
+  <tr><td>6:6</td><td>79.0</td><td><b>82.0</b></td><td><b>81.29&ndash;81.91</b></td></tr>
+  <tr><td>9:3</td><td>81.0</td><td>79.0</td><td>80.69</td></tr>
+  <tr><td>12:0</td><td><b>83.0</b></td><td>75.0</td><td>73.99</td></tr></table>
+  <p>Under Hypothetical A (monotonic: "more NCA is just better, up to all-NCA"), the best split would be 12:0, and 6:6 would be an unremarkable midpoint. Under Hypothetical B (a genuine peak), 6:6 specifically outperforms every other split, including splits with <i>more</i> NCA blocks. The actual measured result matches the shape of Hypothesis B, at both tested seeds: 6:6 beats pure attention by 4.6&ndash;5.3 points <i>and</i> beats pure NCA by 7.6&ndash;8.4 points, with both of its neighboring splits (3:9 and 9:3) sitting below it. This distinguishes "the specific early-NCA/late-attention ordering matters" from the much weaker claim "using some of both mechanisms tends to help."</p>
+</div>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight</span>
+  <p>Running this ablation at two independent seeds (Chapter 10's reproducibility discussion) matters because a single run's 6:6 result being highest could, in principle, just be that one run's random luck. Seeing the same peaked shape reappear at an entirely separate seed (123) is what turns "this particular run happened to peak at 6:6" into "6:6 is a genuine, repeatable peak" &mdash; the same logic Chapter 37 leans on much more heavily, with three seeds instead of two, for the BUSI result.</p>
+</div>
+
+<div class="chap-eyebrow">Chapter 32 &middot; Part VIII</div>
+<h1 class="chapter">Adversarial Robustness: FGSM and PGD</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>An <b>adversarial example</b> is an input deliberately, minimally altered &mdash; often imperceptibly to a human &mdash; specifically to fool one particular trained network, by using that network's own gradient (Chapter 3) against it. Where ordinary training nudges <i>weights</i> downhill on the loss (Chapter 9), an adversarial attack nudges the <i>input pixels</i> uphill on the loss instead &mdash; same gradient machinery, opposite direction, opposite target variable.</p>
+</div>
+
+<h2>FGSM (Fast Gradient Sign Method)</h2>
+<div class="formula">x<sub>adv</sub> = x + &epsilon; &middot; sign( &nabla;<sub>x</sub> L(&theta;, x, y) )</div>
+<p>&nabla;<sub>x</sub><i>L</i> is the gradient of the loss with respect to the <i>input pixels</i> (not the weights &mdash; exactly Chapter 3's gradient machinery, just differentiating through the network to the input instead of stopping at the weights). <code>sign(&middot;)</code> keeps only the direction of each pixel's gradient (+1 or &minus;1), discarding its magnitude. <i>&epsilon;</i> is a small fixed budget controlling how far any single pixel is allowed to move.</p>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; one FGSM step, two pixels</span>
+  <p>A toy 2-pixel image, <i>x</i> = (0.50, 0.20), and a (illustrative, invented) gradient of the loss with respect to these two pixels: &nabla;<sub>x</sub><i>L</i> = (&minus;0.30, +0.10). Taking the sign: (&minus;1, +1). With budget <i>&epsilon;</i>=0.03: <i>x</i><sub>adv</sub> = (0.50 &minus; 0.03, 0.20 + 0.03) = <b>(0.47, 0.23)</b>. Each pixel moved by exactly &plusmn;<i>&epsilon;</i>, in whichever direction the gradient said would increase the loss fastest &mdash; the same one-step logic as Chapter 9's gradient-descent worked example, run in reverse, on the input instead of the weights.</p>
+</div>
+
+<h2>PGD (Projected Gradient Descent)</h2>
+<p>FGSM takes exactly one step. <b>PGD</b> takes many smaller steps (this project: 20, hence "PGD-20"), each one an FGSM-style gradient step, followed by clipping the result back within the allowed <i>&epsilon;</i>-budget of the original image if it strayed outside. Because it's allowed to iterate and correct course, PGD finds a far more damaging perturbation within the same budget than a single FGSM step can &mdash; it is the standard way to measure a network's <i>worst-case</i> robustness under a given perturbation budget, assuming the attacker has full access to the network's gradients ("white-box" access).</p>
+
+<table class="datatable">
+  <caption><b>Table</b> (paper &sect;5.3). Adversarial robustness. Swin-Tiny was not evaluated under this protocol.</caption>
+  <thead><tr><th>Model</th><th>Clean (%)</th><th>FGSM (%)</th><th>PGD-20 (%)</th></tr></thead>
+  <tbody>
+    <tr><td>ViT-Tiny</td><td>71.88</td><td>11.33</td><td>0.47</td></tr>
+    <tr><td>DeiT-Tiny</td><td>72.27</td><td>15.08</td><td>0.47</td></tr>
+    <tr><td>Pure NCA-ViT</td><td>73.91</td><td>27.50</td><td>2.89</td></tr>
+    <tr class="hl"><td>Hybrid NCA-ViT</td><td>81.41</td><td>28.91</td><td>1.41</td></tr>
+  </tbody>
+</table>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight</span>
+  <p>Under the single-step FGSM attack, both NCA-containing models survive roughly 2&times; better than the pure-attention baselines (&asymp;28&ndash;29% vs. &asymp;11&ndash;15%). Under PGD-20 &mdash; a much stronger, iterative worst-case attack &mdash; every model, NCA-containing or not, is driven down near chance (1/100 = 1%, since this is 100-class CIFAR-100). This is reported for completeness, not as a robustness claim: PGD's whole purpose is to find the worst case an attacker with full model access could construct, and no model here is specifically defended against that; the honest reading is "none of these undefended models withstand a dedicated worst-case attacker," which the paper states plainly rather than searching for a more flattering framing of the PGD numbers.</p>
+</div>
+
+<div class="chap-eyebrow">Chapter 33 &middot; Part VIII</div>
+<h1 class="chapter">Corruption Robustness: CIFAR-100-C</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>Adversarial attacks (Chapter 32) are a worst-case, an intelligent attacker deliberately exploiting one specific network. <b>Corruption robustness</b> asks a different, often more practically relevant question: how does the network handle <i>ordinary, non-adversarial</i> degradation &mdash; sensor noise, motion blur, fog, JPEG compression &mdash; the kind of thing a real camera or imaging device produces without anyone trying to fool the network at all? <b>CIFAR-100-C</b> (Hendrycks &amp; Dietterich, 2019) is a standard benchmark for exactly this: the CIFAR-100 test set, with 19 different corruption types each applied at 5 severity levels, none of them computed adversarially or tailored to any specific model.</p>
+</div>
+
+<p>This project evaluates all five architectures at severities {1, 3, 5}, 1000 images per (corruption, severity) combination &mdash; a deliberate, stated subsample of the full benchmark (which covers all 5 severities at the full test-set size) chosen to keep the full 19-type &times; 5-architecture sweep tractable on a single workstation GPU, reported as a scope limitation rather than presented as the complete grid (Chapter 40 returns to this).</p>
+
+<table class="datatable">
+  <caption><b>Table</b> (paper &sect;5.4). Mean accuracy across all 19 corruption types, severities {1,3,5}.</caption>
+  <thead><tr><th>Model</th><th>Clean (%)</th><th>Corrupted mean (%)</th><th>Retains</th></tr></thead>
+  <tbody>
+    <tr><td>ViT-Tiny</td><td>72.32</td><td>52.18</td><td>72.1%</td></tr>
+    <tr><td>DeiT-Tiny</td><td>72.89</td><td>53.60</td><td>73.5%</td></tr>
+    <tr><td>Swin-Tiny</td><td>81.56</td><td>59.37</td><td>72.8%</td></tr>
+    <tr><td>Pure NCA-ViT</td><td>73.99</td><td>57.36</td><td><b>77.5%</b></td></tr>
+    <tr class="hl"><td>Hybrid NCA-ViT</td><td>81.29</td><td><b>61.88</b></td><td>76.1%</td></tr>
+  </tbody>
+</table>
+
+<p>"Retains" is <i>corrupted mean &divide; clean accuracy</i>, expressed as a percentage &mdash; a measure of <i>relative</i> robustness that doesn't simply reward whichever model started with the highest clean accuracy. It answers "of the accuracy this model had on clean images, how much does it keep once the input is corrupted?" rather than the raw corrupted-accuracy number alone.</p>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight &mdash; this isn't just "bigger models generalize better"</span>
+  <p>Swin-Tiny starts from nearly the same clean accuracy as the Hybrid model (81.56 vs. 81.29) yet falls 2.5 points behind it under corruption &mdash; ruling out "the winner just has a bigger accuracy cushion to fall back on." And Pure NCA-ViT, despite 7.9 points <i>lower</i> clean accuracy than Swin, <i>retains</i> a higher fraction of it under corruption (77.5% vs. 72.8%) &mdash; the retention advantage tracks the presence of the NCA mechanism specifically, not overall model scale or clean accuracy.</p>
+</div>
+
+<figure>
+  <img src="{{IMG:corruption_robustness}}">
+  <figcaption><b>Figure.</b> (a) Mean accuracy vs. corruption severity, all five architectures. (b) The Hybrid model's advantage over the best attention-only baseline, grouped by corruption family &mdash; concentrated in additive pixel noise, absent on blur/weather/photometric, and reversed on impulse noise.</figcaption>
+</figure>
+
+<table class="datatable">
+  <caption><b>Table</b> (paper &sect;5.4). The advantage, broken down by corruption family &mdash; not a single aggregate number.</caption>
+  <thead><tr><th>Family</th><th>Hybrid advantage over best attention-only baseline</th></tr></thead>
+  <tbody>
+    <tr class="hl"><td>Additive pixel noise (gaussian, shot, speckle)</td><td>+8.3&nbsp;pp</td></tr>
+    <tr><td>Compression / resample (pixelate, jpeg)</td><td>+4.7&nbsp;pp</td></tr>
+    <tr><td>Blur (defocus, glass, motion, zoom, gaussian)</td><td>+1.7&nbsp;pp</td></tr>
+    <tr><td>Weather (snow, frost, fog, spatter)</td><td>+1.3&nbsp;pp</td></tr>
+    <tr><td>Geometric (elastic transform)</td><td>+0.3&nbsp;pp</td></tr>
+    <tr><td>Photometric (brightness, contrast, saturate)</td><td>+0.2&nbsp;pp</td></tr>
+    <tr class="hl"><td>Impulse noise (salt-and-pepper)</td><td>&minus;5.9&nbsp;pp</td></tr>
+  </tbody>
+</table>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight &mdash; the central finding of the whole project</span>
+  <p>A model that is simply "generally more robust" would show a roughly uniform advantage across every row of that table. Instead, the advantage is heavily concentrated in one specific family (additive pixel noise) and actually <i>reverses sign</i> on one other (impulse noise). A shape this specific and this uneven is a much more informative &mdash; and much more falsifiable &mdash; finding than a single aggregate "corruption robustness score" would have been: it makes a concrete, checkable prediction about <i>where</i> the mechanism should and shouldn't help, which the next chapter tests directly against the network's internal behavior, not just its final accuracy.</p>
+</div>
+
+<div class="chap-eyebrow">Chapter 34 &middot; Part VIII</div>
+<h1 class="chapter">Mechanism Verification: Representation Drift</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>Chapter 33's frequency-specific pattern is a fact about <i>accuracy</i> &mdash; the network's final answer. It doesn't, by itself, prove anything about <i>why</i>. This chapter tests the proposed explanation &mdash; "iterated local averaging suppresses independent, per-pixel additive noise" &mdash; directly, by measuring what happens <i>inside</i> the network, without training anything new or looking at whether any prediction was right or wrong.</p>
+</div>
+
+<h2>Cosine similarity and drift</h2>
+<p>Recall the dot product (Chapter 1) measures how much two vectors "point the same way," but its raw value also depends on the vectors' lengths. <b>Cosine similarity</b> divides that out, comparing pure <i>direction</i>:</p>
+<div class="formula">cos(a, b) = (a &middot; b) / (|a| |b|)<span class="lbl2">|a| = &radic;(a&middot;a), the vector's length (Chapter 1)</span></div>
+<p>Cosine similarity ranges from +1 (pointing identically) through 0 (perpendicular, unrelated) to &minus;1 (pointing exactly opposite). This project defines <b>drift</b> as 1 minus this value:</p>
+<div class="formula">drift = 1 &minus; cos( f<sub>clean</sub>, f<sub>corrupted</sub> )</div>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; drift between a clean and a corrupted feature vector</span>
+  <p>Toy 3-dimensional feature vectors (illustrative): <i>f</i><sub>clean</sub> = (3, 4, 0), <i>f</i><sub>corrupted</sub> = (3, 3, 1).</p>
+  <p>Dot product: 3&times;3 + 4&times;3 + 0&times;1 = 9+12+0 = 21. Lengths: |<i>f</i><sub>clean</sub>| = &radic;(9+16+0) = &radic;25 = 5; |<i>f</i><sub>corrupted</sub>| = &radic;(9+9+1) = &radic;19 &asymp; 4.359.</p>
+  <p>cos = 21 / (5&times;4.359) = 21 / 21.795 &asymp; <b>0.9635</b>. drift = 1 &minus; 0.9635 = <b>0.0365</b>. A small drift, meaning corruption barely rotated this particular feature vector's direction &mdash; if this were a real model's classifier-input feature, it would suggest the corruption had little effect on what the classifier actually "sees," largely independent of whether the final prediction changed.</p>
+</div>
+
+<h2>Which feature, exactly?</h2>
+<p>"Drift" is only a meaningful test of <i>this network's actual robustness</i> if it's measured at the exact vector the classifier reads to make its decision &mdash; not some arbitrary internal layer. Recall from Chapter 14: ViT and DeiT classify from the CLS token; Swin and both NCA models classify from GAP-pooled patch tokens. This project hooks each model's own real pre-head input specifically, per architecture.</p>
+
+<table class="datatable">
+  <caption><b>Table</b> (paper &sect;5.5). Mean drift across all 19 corruptions, at each model's own real classifier input.</caption>
+  <thead><tr><th>Model</th><th>Mean drift</th></tr></thead>
+  <tbody>
+    <tr class="hl"><td>Hybrid NCA-ViT</td><td>0.199</td></tr>
+    <tr><td>Pure NCA-ViT</td><td>0.187</td></tr>
+    <tr><td>DeiT-Tiny</td><td>0.242</td></tr>
+    <tr><td>ViT-Tiny</td><td>0.253</td></tr>
+    <tr><td>Swin-Tiny</td><td>0.285</td></tr>
+  </tbody>
+</table>
+
+<p>Lower drift means the feature the classifier actually reads moves less under corruption &mdash; more stable internal representations. The Hybrid model's features are more stable than DeiT's on <b>17 of the 19</b> corruption types.</p>
+
+<figure>
+  <img src="{{IMG:noise_drift}}">
+  <figcaption><b>Figure.</b> (a) Pre-head feature drift on the corruptions the Hybrid model wins most (speckle, gaussian) versus the one it loses (impulse). (b) Drift reduction vs. DeiT predicts the accuracy gap on the 11 corruptions where baseline accuracy is under 65% (r=0.77); near-ceiling corruptions dilute the aggregate correlation to r=0.17 across all 19.</figcaption>
+</figure>
+
+<h2>The falsification test</h2>
+<div class="box intuition">
+  <span class="box-lbl">Intuition &mdash; what makes a claim scientific rather than just descriptive</span>
+  <p>A claim earns real evidential weight not just by matching data after the fact, but by having made a specific, risky prediction <i>in advance</i> &mdash; one that could have come out wrong. If the theory here ("local averaging suppresses independent additive noise but spreads sparse extreme-valued outliers instead of rejecting them") is right, it doesn't just predict the Hybrid model should be more stable in general &mdash; it predicts one <i>specific exception</i>: impulse noise (isolated, extreme-valued pixels, unlike the smoothly-distributed additive noise the mechanism is suited to) should show the <i>opposite</i> pattern, with the Hybrid model's features drifting <i>more</i>, not less, than DeiT's. This is a prediction that could have simply failed to show up.</p>
+</div>
+
+<p>It didn't fail. Impulse noise is the <i>only</i> corruption, of all 19, where the Hybrid model's features are less stable than DeiT's &mdash; drift 6.8% higher (relative) than DeiT, compared to a 16&ndash;26% <i>reduction</i> on the corruptions where the Hybrid model wins. It is also the only corruption family with a large accuracy loss (Chapter 33's table). The sign of the exception was predicted before the drift numbers were computed, not pattern-matched afterward.</p>
+
+<h2>Correlation, and an honest caveat about it</h2>
+<p>A <b>correlation coefficient</b>, <i>r</i>, summarizes how tightly two quantities move together across many data points: <i>r</i>=+1 means they move in perfect lockstep, <i>r</i>=0 means no relationship, <i>r</i>=&minus;1 means they move in perfect opposition. The paper reports <i>r</i>=0.17 between drift-reduction and accuracy-gap across all 19 corruptions &mdash; weak &mdash; but <i>r</i>=0.77 &mdash; strong &mdash; restricted to the 11 corruptions where baseline accuracy is under 65%.</p>
+<div class="box pitfall">
+  <span class="box-lbl">Pitfall &mdash; reported as descriptive, not as proof</span>
+  <p>The 65% threshold was chosen <i>after</i> looking at the data, to explain why near-ceiling corruptions (where a baseline is already, say, 90% accurate) have almost no headroom left for extra representational stability to convert into extra accuracy &mdash; there's nowhere left for the number to go up. Because the threshold was chosen after the fact rather than fixed in advance, the paper explicitly labels this split as descriptive rather than as a pre-registered statistical test, and states clearly that the <i>sign</i> result (the falsification test above) is the part that carries real evidential weight, while the magnitude/correlation split is offered only as a plausible explanation for <i>why</i> the correlation isn't stronger everywhere, not as independent proof of anything.</p>
+</div>
+
+<div class="chap-eyebrow">Chapter 35 &middot; Part VIII</div>
+<h1 class="chapter">Case Study &mdash; the Bug in the Drift Measurement</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>Chapter 34 presented the drift-mechanism result as if it emerged cleanly on the first attempt. It didn't. This chapter tells what actually happened, because catching your own methodological error before anyone else does &mdash; and understanding precisely <i>why</i> it was wrong, not just that the numbers looked off &mdash; is itself part of doing this project carefully, and worth being able to explain to a mentor or a reviewer exactly as it happened.</p>
+</div>
+
+<div class="box pitfall">
+  <span class="box-lbl">What went wrong, the first time</span>
+  <p>The first version of this analysis measured drift (Chapter 34) at one fixed, specific mid-network layer, applied <i>uniformly</i> to every one of the five architectures &mdash; the same layer index, regardless of which model was being probed. The result: the Hybrid model appeared <i>less</i> stable than DeiT under corruption &mdash; the exact opposite of what the accuracy results (Chapter 33) predicted. This was a genuinely alarming contradiction: either the accuracy-based theory was wrong, or something about the drift measurement itself was invalid.</p>
+</div>
+
+<div class="box worked">
+  <span class="box-lbl">Diagnosing it &mdash; why a "fair-looking" measurement was actually unfair</span>
+  <p>Recall from Chapter 14 and Chapter 34: DeiT's classifier reads <i>only</i> the CLS token &mdash; it never looks at the patch tokens directly at all. Probing "a fixed mid-network layer's patch tokens" for DeiT was therefore measuring the stability of a representation <b>DeiT's own classifier never actually uses to make its decision</b>. Whatever that patch-token representation was doing under corruption &mdash; stable or unstable &mdash; was simply irrelevant to how DeiT actually classifies, because DeiT throws that information away and reads CLS instead. Meanwhile Swin and both NCA models genuinely do classify from (a pooled version of) patch tokens &mdash; so the "same" measurement was measuring something meaningful for three of the five models and something structurally irrelevant for the other two, while presenting all five numbers side by side as if they were comparable.</p>
+</div>
+
+<p><b>The fix</b>: instead of one fixed layer for every model, hook each model's own actual pre-head input &mdash; whatever specific vector its own classifier genuinely reads, per Chapter 34's table (CLS for ViT/DeiT, GAP'd patch tokens for Swin and both NCA variants). This single change reversed the conclusion, back into agreement with the accuracy-based prediction: the Hybrid model's real classifier input is measurably more stable than DeiT's, on 17 of 19 corruptions.</p>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight &mdash; why this is worth including at all, rather than quietly fixing it and moving on</span>
+  <p>A methodologically invalid measurement can still produce a clean, confident, precisely-numbered, entirely wrong result &mdash; there was nothing statistically noisy or ambiguous about the first (incorrect) version; it was simply measuring the wrong thing, consistently. Catching this required understanding <i>what the metric was supposed to represent</i> &mdash; "the input the classifier actually reads" &mdash; not just computing a number correctly in isolation and checking it against a sanity threshold. This case study is included explicitly, by name, in both the paper and this book, rather than silently corrected, because a mentor or reviewer who understands this failure mode will trust the final, corrected result more, not less &mdash; and because it's a genuinely useful, transferable lesson about representation-level analysis in any Vision Transformer variant with a nonstandard classification head, not just this project's specific models.</p>
+</div>
+
+<div class="chap-eyebrow">Chapter 36 &middot; Part VIII</div>
+<h1 class="chapter">Grad-CAM: Seeing What the Network Looks At</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>Every result so far has been a number. <b>Grad-CAM</b> (Gradient-weighted Class Activation Mapping) produces something you can look at directly: a heatmap over the input image, highlighting which regions most influenced the network's prediction for a specific class &mdash; a visual sanity check that the network is basing its decision on the object itself, rather than some unrelated shortcut like background texture.</p>
+</div>
+
+<h2>How it's computed</h2>
+<p>For a chosen convolutional feature map <i>A</i> (a grid of channel activations partway through the network) and a target class score <i>y<sup>c</sup></i>, Grad-CAM computes the gradient of the class score with respect to that feature map &mdash; exactly Chapter 3's gradient machinery, applied to an internal feature map instead of a weight &mdash; and averages it spatially, per channel, to get one importance weight <i>&alpha;<sub>k</sub></i> per channel <i>k</i>:</p>
+<div class="formula">&alpha;<sub>k</sub><sup>c</sup> = GlobalAveragePool( &part;y<sup>c</sup> / &part;A<sup>k</sup> )</div>
+<p>The heatmap is then a weighted sum of the feature map's channels, using these importance weights, passed through ReLU (Chapter 7) to discard any channel that pushed the score <i>down</i> and keep only the ones that pushed it <i>up</i> in support of the target class:</p>
+<div class="formula">L<sub>Grad-CAM</sub><sup>c</sup> = ReLU( &Sigma;<sub>k</sub> &alpha;<sub>k</sub><sup>c</sup> A<sup>k</sup> )</div>
+
+<figure>
+  <img src="{{IMG:gradcam_noisy}}">
+  <figcaption><b>Figure.</b> Grad-CAM under gaussian noise (severity 3): three CIFAR-100 test images where DeiT-Tiny, ViT-Tiny, Swin-Tiny, and Pure NCA-ViT all misclassify, and Hybrid NCA-ViT does not.</figcaption>
+</figure>
+
+<div class="box pitfall">
+  <span class="box-lbl">How the examples were chosen &mdash; avoiding cherry-picking</span>
+  <p>It would be easy, and misleading, to scroll through images by eye until three "nice-looking" examples turn up. Instead, the selection criterion was fixed in advance and applied mechanically: search all 600 relevant test images for the cases with the <i>highest agreement among the four baseline models on the wrong answer</i>, specifically where the Hybrid model gets it right. This is a search over a stated, fixed criterion applied to the whole set, not a visual pick &mdash; the same distinction Chapter 33 draws between a single "robustness score" and a decomposed, falsifiable claim: a rule stated and applied consistently is trustworthy in a way that "we looked until we found a good one" is not.</p>
+</div>
+
+<div class="chap-eyebrow">Chapter 37 &middot; Part VIII</div>
+<h1 class="chapter">Real-World Validation: BUSI Breast Ultrasound</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>Every result so far uses a synthetic corruption benchmark (Chapter 33) &mdash; noise added by software to an otherwise-clean photograph. This chapter tests the theory's prediction on a domain where the "noise" is not synthetic at all: it's a physical, unavoidable property of how the imaging device works.</p>
+</div>
+
+<h2>Why ultrasound, specifically</h2>
+<p><b>Speckle</b> is a granular, high-frequency interference pattern that appears in any imaging modality using coherent waves &mdash; ultrasound reflects sound waves off tissue, and where many reflected wavefronts overlap, they interfere constructively and destructively, producing a grainy texture layered on top of the real anatomical structure. It is not sensor malfunction or a processing artifact; it is intrinsic to the physics of the imaging method itself, present in essentially every clinical ultrasound image. Chapter 33's frequency-family breakdown found speckle_noise specifically responsible for the single largest per-corruption advantage measured anywhere in the whole CIFAR-100-C sweep (+9.6 percentage points, within the +8.3pp additive-noise family average) &mdash; making ultrasound a domain where the theory makes a strong, specific, checkable prediction, rather than a generic "let's also try a medical dataset."</p>
+
+<p>The dataset used is <b>BUSI</b> (Al-Dhabyani et al., 2020): 780 breast ultrasound images from 600 patients, labeled into 3 classes &mdash; 437 benign, 210 malignant, 133 normal &mdash; trained completely from scratch (Chapter 10), with no pretraining, at the same underlying recipe used everywhere else in this project.</p>
+
+<h2>Why plain accuracy is the wrong metric here</h2>
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; why 56.1% top-1 accuracy can mean nothing at all</span>
+  <p>437 of 780 images (56.1%) are the "benign" class. A classifier that <i>always</i> outputs "benign," regardless of the input &mdash; a model that has learned literally nothing about the images &mdash; scores 56.1% top-1 accuracy purely by exploiting the class imbalance. Any accuracy number below roughly 56% would actually be informative (worse than doing nothing), but a number comfortably above 56% could still just mean "leans benign a bit more often than chance," not "learned to distinguish the classes."</p>
+</div>
+
+<p>Two metrics that don't have this blind spot: <b>balanced accuracy</b> (the average of each class's own recall, so every class counts equally regardless of how many examples it has) and <b>macro-F1</b> (the average of each class's own F1 score &mdash; itself a balance of precision and recall for that class).</p>
+
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; balanced accuracy and macro-F1, from a toy confusion matrix</span>
+  <p>A small, invented 3-class confusion matrix (rows = true class, columns = predicted class, 30 toy test images total, mirroring BUSI's imbalance):</p>
+  <table><tr><th>True \ Pred</th><th>Benign</th><th>Malignant</th><th>Normal</th><th>Total</th></tr>
+  <tr><td>Benign (17)</td><td>13</td><td>3</td><td>1</td><td>17</td></tr>
+  <tr><td>Malignant (8)</td><td>2</td><td>5</td><td>1</td><td>8</td></tr>
+  <tr><td>Normal (5)</td><td>2</td><td>0</td><td>3</td><td>5</td></tr></table>
+  <p><b>Recall</b> per class (correct predictions &divide; true total for that class): Benign 13/17=0.765; Malignant 5/8=0.625; Normal 3/5=0.600.</p>
+  <p><b>Balanced accuracy</b> = mean of the three recalls = (0.765+0.625+0.600)/3 = <b>0.663</b> (66.3%) &mdash; notice this treats the 5-image Normal class as equally important as the 17-image Benign class, unlike plain accuracy, which would let Benign's larger count dominate the average.</p>
+  <p><b>Precision</b> per class (correct predictions &divide; total <i>predicted</i> as that class): Benign 13/(13+2+2)=13/17=0.765; Malignant 5/(3+5+0)=5/8=0.625; Normal 3/(1+1+3)=3/5=0.600 (matching recall in this particular toy example only by coincidence of the numbers chosen).</p>
+  <p><b>F1</b> per class = 2&times;precision&times;recall / (precision+recall): Benign = 2&times;0.765&times;0.765/(1.53) = 0.765; similarly Malignant = 0.625, Normal = 0.600.</p>
+  <p><b>Macro-F1</b> = mean of the three F1 scores = (0.765+0.625+0.600)/3 = <b>0.663</b> (66.3%). Both metrics above are computed by averaging per-class performance <i>after</i> it's calculated separately per class &mdash; the minority class's poor performance can't be hidden by the majority class's strong performance, the way it can be under plain top-1 accuracy.</p>
+</div>
+
+<h2>The Mixup story (methodology case study #2)</h2>
+<div class="box pitfall">
+  <span class="box-lbl">The first run gave an ambiguous, contradictory result</span>
+  <p>Run at the CIFAR-100 recipe entirely unchanged (Mixup/CutMix on, no class weighting, Chapter 10), the Hybrid model <i>won</i> on top-1 accuracy (61.94% vs. 54.84%) but <i>lost</i> on balanced accuracy (40.89% vs. 47.01%) and macro-F1 (37.40% vs. 41.60%) &mdash; a genuinely confusing split verdict, not a clean win either way.</p>
+</div>
+<p>The likely cause: BUSI has only 625 training images after the split, roughly 9 batches of 64 per epoch (Chapter 10), and just 107 of those 625 are the minority "normal" class. Mixup (Chapter 10) blends pairs of images and labels together &mdash; with so few minority-class examples to begin with, a large fraction of the "normal" class's already-scarce signal gets diluted into blended, partial-credit examples before either model has enough clean repetitions to learn the class distinctly. The fix: disable Mixup and CutMix entirely for this dataset, and add <b>inverse-frequency class-weighted cross-entropy</b> &mdash; scaling each class's contribution to the loss (Chapter 8) up or down in inverse proportion to how common that class is in training, so the numerically rare "normal" and "malignant" classes contribute as much total learning signal as the common "benign" class, rather than being statistically drowned out by it.</p>
+
+<h2>The result, replicated across 3 seeds</h2>
+<p>A single favorable-looking run after a recipe change could itself just be luck. To check, both architectures were retrained at 3 independent seeds under the corrected recipe (no Mixup/CutMix, class-weighted CE).</p>
+<table class="datatable">
+  <caption><b>Table</b> (paper &sect;5.7). 3 seeds, no Mixup/CutMix, class-weighted cross-entropy.</caption>
+  <thead><tr><th></th><th>Balanced accuracy</th><th>Macro-F1</th></tr></thead>
+  <tbody>
+    <tr><td>DeiT-Tiny (mean &plusmn; std, n=3)</td><td>36.39 &plusmn; 3.0%</td><td>20.97 &plusmn; 6.7%</td></tr>
+    <tr class="hl"><td>Hybrid NCA-ViT (mean &plusmn; std, n=3)</td><td><b>49.83 &plusmn; 7.3%</b></td><td><b>41.46 &plusmn; 1.9%</b></td></tr>
+    <tr><td>Overlap between architectures</td><td><b>none</b></td><td><b>none</b></td></tr>
+  </tbody>
+</table>
+<div class="box worked">
+  <span class="box-lbl">Worked Example &mdash; what "mean &plusmn; std" means, and how it was computed</span>
+  <p>Standard deviation measures how spread out a set of numbers is around their mean &mdash; a small std means the numbers cluster tightly; a large std means they vary a lot from run to run. For three toy numbers 44, 50, 56 (mean 50): deviations from the mean are &minus;6, 0, +6; squared deviations are 36, 0, 36; their average is 24; the square root of 24 &asymp; <b>4.9</b> &mdash; so this toy set would be reported as "50 &plusmn; 4.9." The real Hybrid model's balanced-accuracy std of 7.3 (on a mean of 49.83) says the three actual training runs landed at somewhat different points &mdash; genuine run-to-run variation, openly reported rather than smoothed over by only showing the mean.</p>
+</div>
+
+<figure>
+  <img src="{{IMG:busi_seeds}}">
+  <figcaption><b>Figure.</b> Balanced accuracy and macro-F1 across 3 seeds. The Hybrid model's worst seed beats DeiT's best seed, on both metrics.</figcaption>
+</figure>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight &mdash; why "no overlap" is stronger evidence than comparing means alone</span>
+  <p>The Hybrid model's <i>worst</i> of its 3 seeds (44.42% balanced accuracy) still beats DeiT's <i>best</i> of its 3 seeds (39.82%) &mdash; the same holds for macro-F1 (39.32% vs. 28.56%). This means that even granting DeiT its luckiest run and the Hybrid model its unluckiest one, there is still no overlap: across every seed actually tried, DeiT never caught up. That is meaningfully stronger evidence than "the average was higher," because it doesn't rely on trusting that the specific seeds tried were themselves perfectly representative &mdash; though with only <i>n</i>=3 seeds per architecture, this remains a small sample, and the paper is careful to call the result "suggestive and consistent," not a large-sample statistical guarantee.</p>
+</div>
+
+<p>A second, unplanned finding fell out of the reruns: <b>DeiT's top-1 accuracy fell below the 56.13% majority-class baseline</b> (Chapter 37's opening worked example) <b>on all 3 seeds</b> (32.26%, 30.32%, 28.39%) &mdash; under aggressive class-reweighting with Mixup's regularizing effect removed, DeiT appears not to be learning the task at all, while the Hybrid model remained informative throughout. Whether this instability is itself a downstream consequence of the same noise-suppression mechanism (plausible: an implicit smoothing effect could also stabilize optimization, not just resist corruption) or an unrelated finding is explicitly left as an open question rather than asserted as a proven causal claim &mdash; there is no controlled experiment in this project that isolates the two possibilities from each other.</p>
+
+<div class="box pitfall">
+  <span class="box-lbl">The patient-split caveat, stated plainly</span>
+  <p>BUSI's public release provides no patient identifiers for its 600 patients. This means a train/validation split guaranteed to keep every patient entirely on one side is not constructible from the public data &mdash; images from the same patient may appear on both sides of the split used here, which can inflate absolute performance numbers for <i>every</i> architecture, roughly equally, since nothing about the potential leakage favors one architecture's mechanism over another's. The <i>comparison</i> between architectures &mdash; which is what this section's claim actually rests on &mdash; is not undermined by this. But the absolute balanced-accuracy numbers themselves should not be read as an estimate of how either model would generalize to a genuinely new, unseen patient; that would require a dataset release with patient-level identifiers, which this one does not provide.</p>
+</div>
+
+<div class="chap-eyebrow">Chapter 38 &middot; Part VIII</div>
+<h1 class="chapter">Emergent Receptive Field, Measured</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>Chapter 13 derived a theoretical prediction: after <i>K</i> iterations of a 3&times;3 local rule, information should be able to spread across a (2<i>K</i>+1)&times;(2<i>K</i>+1) region. This chapter checks that prediction directly against the trained network's actual behavior, rather than simply assuming the theory holds.</p>
+</div>
+
+<p>The measurement: seed a single active cell in an otherwise-empty (all-zero) input grid, run it through one Emergent Attention block, and directly observe how far the resulting activation has spread after each of the <i>K</i>=4 iterations &mdash; an empirical trace of exactly the process worked through by hand in Chapter 23, run for real, inside a trained block, rather than by hand on a 3&times;3 toy grid.</p>
+
+<figure>
+  <img src="{{IMG:receptive_field}}">
+  <figcaption><b>Figure.</b> Measured receptive-field growth of a single NCA block (block 0), as a function of iteration count, consistent with the (2K+1)&times;(2K+1) theoretical bound from Chapter 13.</figcaption>
+</figure>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight</span>
+  <p>This chapter is deliberately the simplest in Part VIII &mdash; a direct empirical check of a specific numeric prediction, with no ambiguity in how to interpret the result. It closes the loop the rest of this part opened: Chapter 13 predicted a specific number from first principles; this measurement confirms the trained network actually behaves the way that theory said it should, before Part IX steps back to ask what all of this, taken together, actually establishes.</p>
+</div>
+
+<div class="part-title">
+  <div class="part-num">Part IX</div>
+  <div class="part-name">Putting It Together</div>
+  <div class="part-desc"><p style="text-align:left;">Five closing chapters: what's genuinely new here compared to the two closest prior works, the limitations stated as plainly as the results, what "patentable" actually means for this kind of project, a full glossary, and a map back to the paper, the patent disclosure, and the code.</p></div>
+  <div class="part-chapters">
+    <div>39. What Is Actually New Here</div>
+    <div>40. Honest Limitations</div>
+    <div>41. From Research to Patent, in Plain English</div>
+    <div>42. Glossary</div>
+    <div>43. Where to Find Everything</div>
+  </div>
+</div>
+
+<div class="chap-eyebrow">Chapter 39 &middot; Part IX</div>
+<h1 class="chapter">What Is Actually New Here</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>Two published papers already combine Neural Cellular Automata with Vision Transformers (Chapter 21 previewed this). Knowing exactly how this project differs from both is the difference between a defensible novelty claim and an overstated one &mdash; the question a patent examiner, a peer reviewer, or a mentor will ask first.</p>
+</div>
+
+<table class="datatable">
+  <caption><b>Table.</b> This project vs. the two closest prior works.</caption>
+  <thead><tr><th>Work</th><th>How attention and NCA relate</th></tr></thead>
+  <tbody>
+    <tr><td>AdaNCA (NeurIPS 2024)</td><td>NCA blocks inserted <i>between</i> existing attention layers, as adaptors. Attention remains the primary mixer throughout the network.</td></tr>
+    <tr><td>ViTCA (NeurIPS 2022)</td><td>Attention is computed <i>inside</i> the NCA cell-update rule itself &mdash; fused together, not separated into distinct blocks.</td></tr>
+    <tr class="hl"><td>This project</td><td>Emergent Attention blocks contain <b>no attention computation at all</b>. Pure NCA-ViT (Chapter 27) removes attention from the entire network and still functions, just at lower accuracy &mdash; demonstrating the replacement is total, not partial.</td></tr>
+  </tbody>
+</table>
+
+<p>Three specific differences, stated precisely:</p>
+<ul>
+  <li><b>Full replacement, not augmentation or fusion.</b> No attention operation occurs anywhere inside an Emergent Attention block (Chapter 23); Chapter 27's Pure NCA-ViT is the direct proof this replacement is complete, not partial.</li>
+  <li><b>Fixed, non-learned perception by default</b> (Chapter 24, reason 1) &mdash; a specific, deliberate choice about which parameters the network is and isn't allowed to adapt.</li>
+  <li><b>A frequency-specific, mechanistically-verified robustness claim</b> (Chapters 33&ndash;35), not an aggregate one. AdaNCA reports improved robustness across several benchmarks including "certain types of noise," but its published description does not decompose <i>which</i> corruption families benefit or offer a representation-level causal account of <i>why</i>. This project instead predicts a specific failure mode (impulse noise) <i>before</i> measuring it, and confirms the sign of that prediction directly in the network's internal features (Chapter 34) &mdash; a stronger, more falsifiable form of claim than "robustness improved on average."</li>
+</ul>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight</span>
+  <p>The honest, defensible version of this project's novelty claim is not "NCA improves Vision Transformer robustness" (a claim two other papers already made, in different forms). It's narrower and more specific: <i>iterated local NCA dynamics can fully replace global attention, not just augment it, and the resulting robustness has a precise, predictable shape rather than being a general improvement</i>. This is the exact framing the paper and the patent disclosure both use, and it's the version worth defending in front of a skeptical reviewer or examiner, because every piece of it is something this book has shown being tested directly, not merely asserted.</p>
+</div>
+
+<div class="chap-eyebrow">Chapter 40 &middot; Part IX</div>
+<h1 class="chapter">Honest Limitations</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>A results section that never mentions a weakness is less trustworthy than one that does &mdash; every limitation below appears explicitly in the paper's own Discussion section, stated as plainly as any of the positive results.</p>
+</div>
+
+<ul>
+  <li><b>Speed.</b> Throughput is roughly 3&times; lower than DeiT-Tiny, FLOPs about 2.2&times; higher (Chapter 25). The underlying complexity argument (linear vs. quadratic in token count) is theoretically sound, but no fused GPU kernel exists yet for the K-iteration loop, so the practical speed advantage the theory predicts hasn't been realized in this implementation.</li>
+  <li><b>Single-seed headline numbers.</b> Table 1's main CIFAR-100 accuracy figures (Chapter 30) are reported at a single seed (42). The depth-ordering ablation (Chapter 31) and the BUSI validation (Chapter 37) additionally cover seeds 123 and 7, but full multi-seed variance for the headline clean-accuracy comparison itself is not yet available.</li>
+  <li><b>A stratified corruption subset, not the full benchmark.</b> Chapter 33's evaluation uses 1000 images per (corruption, severity) cell at 3 of CIFAR-100-C's 5 severities, chosen to keep a 19-type &times; 5-architecture sweep tractable on a single workstation GPU &mdash; not the full 950,000-image grid. There's no specific reason to expect the pattern to change on the full grid, but this has not been verified.</li>
+  <li><b>BUSI's patient-split caveat</b> (Chapter 37): absolute balanced-accuracy numbers should not be read as clean-generalization estimates; the architecture comparison is the part that holds.</li>
+  <li><b>The impulse-noise failure is real, not an edge case to explain away</b> (Chapters 33&ndash;34): any deployment where salt-and-pepper-style sensor faults dominate should not expect this architecture to help, and should expect it might actively hurt.</li>
+  <li><b>Scale.</b> Everything in this project is CIFAR-100-scale data and tiny-scale models (5&ndash;8M parameters, Chapter 27's table). ImageNet-1k and larger-scale behavior are untested.</li>
+</ul>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight</span>
+  <p>Similarly, the paper is explicit that the corruption-robustness and BUSI results are offered as an <i>architectural property with a candidate downstream application</i> &mdash; not a validated clinical claim. Section 5.7 of the paper is a controlled architecture comparison on a public benchmark dataset, not a diagnostic accuracy claim, and should never be represented as evidence of clinical readiness. This distinction matters directly for Chapter 41.</p>
+</div>
+
+<div class="chap-eyebrow">Chapter 41 &middot; Part IX</div>
+<h1 class="chapter">From Research to Patent, in Plain English</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>A research paper and a patent application are answering different questions. The paper asks "is this true, and can it be reproduced?" A patent asks "is this a new, non-obvious, useful technical invention, described precisely enough that someone skilled in the field could build it?" This chapter explains, in plain terms, what that second question involves &mdash; and two specific legal issues flagged for the mentor's patent agent, rather than resolved here, because they are legal judgment calls, not engineering ones.</p>
+</div>
+
+<h2>What "patentable" generally requires</h2>
+<p>Broadly, and in most jurisdictions including India: an invention must be <b>novel</b> (not already publicly known or published, anywhere, before the filing date), involve an <b>inventive step</b> (not obvious to someone already skilled in the relevant field, given what's already known), and have <b>industrial applicability</b> (it must actually be usable/makeable, not purely theoretical). The project's engineering work &mdash; the specific mechanism (Chapter 23), the specific design decisions and their justifications (Chapter 24), and the specific, measured technical effect (Part VIII) &mdash; is the raw material for arguing all three; whether that argument succeeds, and how it should be worded, is what a patent agent is for.</p>
+
+<h2>Two India-specific legal flags</h2>
+<div class="box pitfall">
+  <span class="box-lbl">Section 3(k) &mdash; mathematical methods and computer programs</span>
+  <p>India's Patents Act, Section 3(k), excludes "a mathematical method or a computer programme per se" from being treated as a patentable invention. An architecture described purely as a sequence of formulas (which is, honestly, most of what Chapter 23 is) risks being read this way. The standard path around this exclusion is to frame the invention around its <b>concrete technical effect</b> &mdash; a specific, measurable improvement in how a physical or technical system behaves (here: the measured corruption-robustness and representation-stability results of Part VIII) &mdash; rather than the underlying mathematics in isolation. Whether a given claim's wording achieves this framing successfully is a legal judgment call that depends on precise claim drafting, which is exactly why this is flagged for the patent agent rather than treated as already resolved.</p>
+</div>
+<div class="box pitfall">
+  <span class="box-lbl">Section 3(i) &mdash; methods of diagnosis</span>
+  <p>Section 3(i) excludes methods of diagnosis, treatment, or surgery practiced directly on the human or animal body. Because Chapter 37's validation uses a medical imaging dataset (breast ultrasound), there's a real risk of a claim being read as "a method of diagnosing breast cancer" rather than as what it actually is: a general-purpose image-classification architecture, validated in one particular application domain among others. This is exactly why the patent disclosure frames BUSI as one <b>embodiment</b> of a general system claim (Chapter 37's own framing throughout this book: "a controlled architecture comparison on a public benchmark dataset," never a diagnostic claim) rather than as a stand-alone diagnostic method claim &mdash; again, a claim-drafting decision for the patent agent, not something settled by the engineering alone.</p>
+</div>
+
+<h2>Provisional vs. complete specification</h2>
+<p>A <b>provisional specification</b> is a shorter, earlier filing that secures a priority date (the legal "first to file" timestamp competitors are measured against) without needing every claim finalized, giving 12 months to file the full <b>complete specification</b> with polished, legally precise claims. This project's patent disclosure was prepared as a provisional specifically because the research is still active &mdash; more validation (larger scale, more seeds, per Chapter 40) may still change or strengthen exactly how the claims should be worded, and a provisional secures the priority date now without locking in claim language before that work is done.</p>
+
+<div class="box insight">
+  <span class="box-lbl">Key Insight</span>
+  <p>The separate <i>Patent Disclosure</i> document (delivered alongside this book and the paper) is written specifically for this handoff: a scannable executive summary and evidence index up front, both legal flags called out explicitly on the first content page, and the formal, precisely-worded claims held in a clearly labeled section near the end, for the patent agent to read closely while the mentor can skim everything before it. Chapter 43 points to exactly where each piece lives.</p>
+</div>
+
+<div class="chap-eyebrow">Chapter 42 &middot; Part IX</div>
+<h1 class="chapter">Glossary</h1>
+
+<dl class="glossary">
+  <dt>AdamW</dt><dd>The optimizer used throughout this project &mdash; Adam-style adaptive gradient descent (Chapter 9) with weight decay applied directly rather than folded into the gradient.</dd>
+  <dt>Adversarial example</dt><dd>An input deliberately, minimally altered using a network's own gradient to cause misclassification (Chapter 32).</dd>
+  <dt>AMP (mixed precision)</dt><dd>Training with most numbers in 16-bit instead of 32-bit precision, for speed and memory savings (Chapter 10).</dd>
+  <dt>Attention / self-attention</dt><dd>A mechanism where every token compares itself (via Query/Key dot products) against every other token to compute a weighted blend of their Values (Chapter 15).</dd>
+  <dt>Backpropagation</dt><dd>The algorithm that computes the loss's gradient with respect to every weight in a network, via repeated application of the chain rule (Chapter 9).</dd>
+  <dt>Balanced accuracy</dt><dd>The average of each class's own recall &mdash; unaffected by class imbalance, unlike plain accuracy (Chapter 37).</dd>
+  <dt>Batch size</dt><dd>The number of training images processed together before one weight update; 64 throughout this project (Chapter 10).</dd>
+  <dt>Bernoulli distribution</dt><dd>A random variable taking value 1 with probability <i>p</i> and 0 otherwise (Chapter 4); used as the stochastic update gate in Chapter 23.</dd>
+  <dt>Big-O notation</dt><dd>Shorthand for how a cost grows as an input size grows, ignoring constant factors (Chapter 5).</dd>
+  <dt>BUSI</dt><dd>Breast Ultrasound Images dataset, 780 images, 3 classes, used for real-domain validation (Chapter 37).</dd>
+  <dt>Chain rule</dt><dd>The calculus rule for differentiating a composition of functions; the mathematical basis of backpropagation (Chapter 3).</dd>
+  <dt>CIFAR-100 / CIFAR-100-C</dt><dd>The primary 100-class image dataset (Chapter 29) and its corrupted-image robustness benchmark variant (Chapter 33).</dd>
+  <dt>CLS token</dt><dd>A learned, non-spatial token prepended to the patch sequence, traditionally read for classification (Chapter 14); excluded from all NCA computation in this project (Chapter 24).</dd>
+  <dt>Convolution</dt><dd>Sliding a small kernel over a grid, computing a dot product at each position (Chapter 11).</dd>
+  <dt>Corruption robustness</dt><dd>Accuracy under non-adversarial, naturally-occurring image degradation (Chapter 33), as distinct from adversarial robustness (Chapter 32).</dd>
+  <dt>Cosine similarity</dt><dd>A dot product normalized by vector lengths, measuring pure directional similarity (Chapter 34).</dd>
+  <dt>Cross-entropy loss</dt><dd>The standard classification loss, &minus;log of the predicted probability assigned to the correct class (Chapter 8).</dd>
+  <dt>Depthwise convolution</dt><dd>A convolution applying a separate filter to each channel independently, with no cross-channel mixing (Chapter 11).</dd>
+  <dt>DeiT</dt><dd>Data-efficient image Transformer; here, an architecture baseline trained under this project's own recipe (Chapter 18).</dd>
+  <dt>Derivative / gradient</dt><dd>The slope of a function; the gradient generalizes this to many variables at once (Chapter 3).</dd>
+  <dt>Drift (representation drift)</dt><dd>1 minus the cosine similarity between a model's clean and corrupted classifier-input feature (Chapter 34).</dd>
+  <dt>EMA (exponential moving average)</dt><dd>A slow-moving, smoothed copy of the network's weights, maintained alongside the actively-trained weights (Chapter 10).</dd>
+  <dt>Emergent Attention</dt><dd>This project's NCA-based replacement for self-attention (Chapters 22&ndash;25).</dd>
+  <dt>Epoch</dt><dd>One full pass through the entire training dataset (Chapter 10).</dd>
+  <dt>Falsifiability</dt><dd>The property of a claim that it could, in principle, have been shown wrong by evidence &mdash; the philosophical basis for Chapter 34's drift falsification test.</dd>
+  <dt>F1 score / macro-F1</dt><dd>The harmonic mean of precision and recall for one class; macro-F1 averages this across all classes equally (Chapter 37).</dd>
+  <dt>FGSM</dt><dd>Fast Gradient Sign Method; a single-step adversarial attack (Chapter 32).</dd>
+  <dt>FLOP / GFLOP</dt><dd>One floating-point operation (an add or multiply); a GFLOP is one billion of them (Chapter 30).</dd>
+  <dt>Grad-CAM</dt><dd>A technique for visualizing which image regions most influenced a network's prediction (Chapter 36).</dd>
+  <dt>Hybrid NCA-ViT</dt><dd>This project's main architecture: 6 Emergent Attention blocks followed by 6 standard attention blocks (Chapter 26).</dd>
+  <dt>Kernel (convolution filter)</dt><dd>A small grid of fixed numbers used to compute a convolution, e.g. a Sobel filter (Chapters 11&ndash;12).</dd>
+  <dt>Label smoothing</dt><dd>Softening a classification target away from exact 0/1 values, to discourage overconfidence (Chapter 8).</dd>
+  <dt>LayerNorm</dt><dd>Normalizing each token's vector to zero mean and unit variance before rescaling (Chapter 16).</dd>
+  <dt>Learning rate</dt><dd>The step size used in gradient descent (Chapter 9); this project uses a cosine schedule with warmup (Chapter 10).</dd>
+  <dt>Linear layer</dt><dd>A matrix multiplication plus a bias vector; the basic building block of every neural network layer (Chapter 2).</dd>
+  <dt>Matrix / matrix multiplication</dt><dd>A rectangular grid of numbers, and the operation of combining two such grids via repeated dot products (Chapter 2).</dd>
+  <dt>MHSA</dt><dd>Multi-head self-attention; several attention computations run in parallel on separate slices of the embedding dimension (Chapter 16).</dd>
+  <dt>Mixup / CutMix</dt><dd>Data augmentation techniques that blend pairs of training images and labels together (Chapter 10); deliberately disabled for BUSI (Chapter 37).</dd>
+  <dt>MLP (multi-layer perceptron)</dt><dd>A small stack of linear layers with activation functions between them (Chapter 6).</dd>
+  <dt>NCA (Neural Cellular Automaton)</dt><dd>A learned, local, iterated update rule applied identically across every cell of a grid (Chapter 20).</dd>
+  <dt>Overfitting</dt><dd>When a network specializes to its training data at the expense of generalizing to new data (Chapter 10).</dd>
+  <dt>Parameters</dt><dd>The individual trainable numbers (weights and biases) inside a network's matrices (Chapter 28).</dd>
+  <dt>Patch embedding</dt><dd>The linear layer that converts a flattened image patch into a token vector (Chapter 14).</dd>
+  <dt>PGD</dt><dd>Projected Gradient Descent; a strong, iterative, worst-case adversarial attack (Chapter 32).</dd>
+  <dt>Position embedding</dt><dd>A learned vector, added per patch position, giving the network access to spatial order (Chapter 14).</dd>
+  <dt>Precision / Recall</dt><dd>Precision: of everything predicted as class X, what fraction was correct. Recall: of everything actually class X, what fraction was correctly found (Chapter 37).</dd>
+  <dt>Provisional specification</dt><dd>An early patent filing that secures a priority date ahead of a full complete specification (Chapter 41).</dd>
+  <dt>Random seed</dt><dd>The starting number that fully determines a run's sequence of "random" choices, making training reproducible (Chapter 10).</dd>
+  <dt>RandAugment / Random Erasing</dt><dd>Data augmentation techniques applying randomized image transforms or occlusions during training (Chapter 10).</dd>
+  <dt>Receptive field</dt><dd>The region of the input that can possibly influence a given output position (Chapter 13).</dd>
+  <dt>ReLU</dt><dd>Rectified Linear Unit; the activation function max(0, x) (Chapter 7).</dd>
+  <dt>Residual connection</dt><dd>Adding a sub-layer's output to its own input, rather than replacing it (Chapter 16).</dd>
+  <dt>Sobel filter</dt><dd>A classical, fixed 3&times;3 kernel approximating a directional brightness gradient (Chapter 12).</dd>
+  <dt>Softmax</dt><dd>A function turning a vector of arbitrary scores into a valid probability distribution (Chapter 7).</dd>
+  <dt>Standard deviation</dt><dd>A measure of how spread out a set of numbers is around their mean (Chapter 37).</dd>
+  <dt>Stochastic gate</dt><dd>The Bernoulli-distributed coin flip deciding whether a given cell's update is applied at a given step (Chapter 23).</dd>
+  <dt>Swin Transformer</dt><dd>A Vision Transformer using windowed local attention and hierarchical downsampling (Chapter 18).</dd>
+  <dt>Token</dt><dd>One element of the sequence a Transformer processes &mdash; one image patch, in this project (Chapter 14).</dd>
+  <dt>Top-1 / Top-5 accuracy</dt><dd>Whether the correct class is the single top prediction, or anywhere in the top 5 (Chapter 29).</dd>
+  <dt>Vector</dt><dd>An ordered list of numbers (Chapter 1).</dd>
+  <dt>ViT (Vision Transformer)</dt><dd>The original patch-based, pure-attention image classification architecture (Chapter 18).</dd>
+  <dt>Weight decay</dt><dd>A constant pull of every weight toward zero during training, discouraging unnecessarily large weights (Chapter 9).</dd>
+  <dt>Zero-initialization</dt><dd>Setting a layer's weights to exactly zero at the start of training, so the layer begins as an identity map (Chapter 24).</dd>
+</dl>
+
+<div class="chap-eyebrow">Chapter 43 &middot; Part IX</div>
+<h1 class="chapter">Where to Find Everything</h1>
+
+<div class="box intuition">
+  <span class="box-lbl">Intuition</span>
+  <p>This book explains; it doesn't replace the other two documents. Use this chapter as a map back to them, and to the code, whenever you need the terse, precise version of something this book spent a full chapter teaching.</p>
+</div>
+
+<table class="datatable">
+  <caption><b>Table.</b> This book's parts, mapped to the paper's sections and the patent disclosure.</caption>
+  <thead><tr><th>This book</th><th><i>Emergent Attention</i> paper</th><th>Patent Disclosure</th></tr></thead>
+  <tbody>
+    <tr><td>Parts I&ndash;V (foundations)</td><td>&sect;2 Related Work, &sect;3.1 Preliminaries</td><td>&sect;3 Background / Prior Art</td></tr>
+    <tr><td>Part VI (the mechanism)</td><td>&sect;3.2&ndash;3.3 Method</td><td>&sect;4, &sect;7 Detailed Description, &sect;8 Claims 1&ndash;4</td></tr>
+    <tr><td>Part VII (architectures)</td><td>&sect;3.3&ndash;3.4, Appendix A</td><td>&sect;4 Architecture</td></tr>
+    <tr><td>Ch. 29&ndash;31 (main result, ablation)</td><td>&sect;4, &sect;5.1&ndash;5.2</td><td>&sect;2 Claims-at-a-glance</td></tr>
+    <tr><td>Ch. 32 (adversarial)</td><td>&sect;5.3</td><td>&mdash;</td></tr>
+    <tr><td>Ch. 33 (corruption robustness)</td><td>&sect;5.4, Appendix C</td><td>&sect;5 Technical Effect</td></tr>
+    <tr><td>Ch. 34&ndash;35 (drift + bug story)</td><td>&sect;5.5</td><td>&sect;5 Technical Effect</td></tr>
+    <tr><td>Ch. 36 (Grad-CAM)</td><td>&sect;5.6</td><td>&mdash;</td></tr>
+    <tr><td>Ch. 37 (BUSI)</td><td>&sect;5.7</td><td>&sect;6 Applied Embodiment, Claim 5</td></tr>
+    <tr><td>Ch. 38 (receptive field)</td><td>&sect;5.8</td><td>&mdash;</td></tr>
+    <tr><td>Ch. 39&ndash;40 (novelty, limits)</td><td>&sect;2, &sect;6 Discussion</td><td>&sect;3 Novelty Gap</td></tr>
+    <tr><td>Ch. 41 (patent basics)</td><td>&mdash;</td><td>&sect;1 Note to Patent Agent, &sect;8 Claims, &sect;9 Abstract</td></tr>
+  </tbody>
+</table>
+
+<p>Every number in this book traces back to a released script or config, per the paper's Reproducibility Statement: <code>python scripts/train.py model=nca_vit_hybrid data=cifar100</code> reproduces the Hybrid result (Chapter 30) at seed 42; <code>scripts/evaluate_corruptions.py</code>, <code>scripts/measure_noise_drift.py</code>, <code>scripts/gradcam_compare.py</code>, and <code>scripts/evaluate_busi.py</code> reproduce Chapters 33, 34, 36, and 37 respectively. Every figure in this book is regenerable from its corresponding <code>scripts/plot_*.py</code> or <code>scripts/evaluate_*.py</code>, and is additionally committed under <code>figures/paper/</code> so none of these three documents depend on rerunning anything to render correctly.</p>
+
+<div class="box insight">
+  <span class="box-lbl">Closing note</span>
+  <p>Every formula in this book was built from five things: a vector, a matrix, a derivative, a probability, and a statement about how cost grows with size. Everything from Chapter 6 onward is those five ideas, combined, renamed, and specialized, over and over. If a sentence in the paper or the patent disclosure ever reads as unfamiliar jargon again, the fix is almost always the same: find which of those five ideas it's secretly built from, and it will already make sense.</p>
+</div>
+
+</body>
+</html>
