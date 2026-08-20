@@ -54,7 +54,16 @@ _DOMAINS = {
     ),
     "busi": dict(
         num_classes=3,
-        ckpt=os.path.join(_REPO_ROOT, "checkpoints", "nca_vit_hybrid", "busi", "seed42", "best.pt"),
+        # NOT checkpoints/nca_vit_hybrid/busi/seed42/ -- that run used the
+        # CIFAR-100 recipe (Mixup/CutMix, unweighted CE) on this severely
+        # imbalanced dataset and collapses to predicting "benign" almost
+        # always (0/26 recall on "normal" -- verified empirically). This is
+        # the corrected recipe (no Mixup/CutMix, class-weighted CE) that
+        # scripts/gradcam_busi.py uses and that paper.md §5.7 reports.
+        ckpt=os.path.join(
+            _REPO_ROOT, "outputs", "exp", "busi_v2_hybrid", "checkpoints",
+            "nca_vit_hybrid", "busi", "seed42", "best.pt",
+        ),
         mean=_IMAGENET_MEAN, std=_IMAGENET_STD,
     ),
 }

@@ -17,10 +17,22 @@ python -m uvicorn webapp.backend.app:app --port 8000
 
 Open **http://localhost:8000**.
 
-Everything runs from the repository root — the backend finds the checkpoints
-at `checkpoints/nca_vit_hybrid/{cifar100,busi}/seed42/best.pt` and the CIFAR-100
-class names at `data/cifar-100-python/meta` relative to the repo, not to
-`webapp/`.
+Everything runs from the repository root — the backend finds the CIFAR-100
+checkpoint at `checkpoints/nca_vit_hybrid/cifar100/seed42/best.pt`, the BUSI
+checkpoint at `outputs/exp/busi_v2_hybrid/checkpoints/nca_vit_hybrid/busi/seed42/best.pt`
+(**not** `checkpoints/nca_vit_hybrid/busi/seed42/` — see below), and the
+CIFAR-100 class names at `data/cifar-100-python/meta`, all relative to the
+repo, not to `webapp/`.
+
+**Why the BUSI checkpoint path looks odd:** an earlier BUSI run
+(`checkpoints/nca_vit_hybrid/busi/seed42/`) used the same recipe as CIFAR-100
+(Mixup/CutMix, unweighted cross-entropy) on this severely imbalanced,
+3-class dataset (56% "benign") and collapsed to predicting "benign" almost
+regardless of input — 0/26 recall on "normal", verified by evaluating it
+directly against the held-out split. The corrected recipe (no Mixup/CutMix,
+inverse-frequency class-weighted CE — the one `paper.md` §5.7 reports and
+`scripts/gradcam_busi.py` already used) lives under `outputs/exp/busi_v2_hybrid/`.
+`inference.py` points at that one.
 
 ## What's in here
 
