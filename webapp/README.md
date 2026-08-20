@@ -34,13 +34,25 @@ inverse-frequency class-weighted CE — the one `paper.md` §5.7 reports and
 `scripts/gradcam_busi.py` already used) lives under `outputs/exp/busi_v2_hybrid/`.
 `inference.py` points at that one.
 
+**BUSI runs as a 3-seed ensemble, not one checkpoint.** Evaluated individually
+against the held-out split, seed42/123/7 each land at 44–58% balanced
+accuracy, but each is weak on a *different* class — seed42 struggles on
+malignant, seed123 on benign, seed7 on normal (verified directly, not assumed).
+Averaging all three's predictions gets 65.5% balanced accuracy, well above any
+one seed alone, using checkpoints this project already had (from the seed-variance
+check behind paper.md §5.7's 3-seed BUSI numbers) — no retraining involved.
+`inference.py` loads `busi_v2_hybrid` (seed42), `busi_v2_s123_hybrid`, and
+`busi_v2_s7_hybrid`, and averages their softmax outputs for the decision and
+their Grad-CAMs (at that decision's class) for the heatmap. CIFAR-100 has no
+such multi-seed structure available, so it still runs as a single checkpoint.
+
 ## What's in here
 
 ```
 webapp/
   backend/
     app.py         FastAPI app: serves the frontend + /api/predict, /api/samples, /api/reason
-    inference.py   loads both checkpoints, runs the model, computes Grad-CAM
+    inference.py   loads the checkpoints (BUSI as a 3-seed ensemble), runs the model, computes Grad-CAM
     reasoning.py   sends the decision to a hosted LLM, gets back plain-language text
     samples.py     serves the pre-built sample gallery (static/samples/)
     static/        sample images + the workflow diagram, served at /static/...
@@ -84,11 +96,13 @@ failing silently.
 - **The BUSI mode carries an explicit on-screen disclaimer** ("demonstration
   only... never be used for real diagnosis") whenever ultrasound mode is
   selected. This is a research artifact, not a cleared medical device.
-- **The malignant sample images are a real, known weak point** — the model's
-  malignant recall is lower than its benign recall at this seed (documented
-  in `paper.md` §5.7 and `scripts/gradcam_busi.py`), so don't be surprised
-  if one of the malignant samples gets misclassified. That's the honest,
-  reproducible result, left in rather than swapped for an easier example.
+- **The ensemble still gets roughly 1 in 3 wrong overall (65.5% balanced
+  accuracy on 3 classes, chance = 33%)**, and "benign" is now its weakest
+  recall (43.7%, vs. 64.3% malignant and 88.5% normal) — the opposite of any
+  single seed. Don't be surprised by an occasional wrong call in either
+  direction; that's the honest, measured, reproducible result on a genuinely
+  small (780-image), severely imbalanced, unsplit-by-patient dataset — not
+  swapped for easier examples.
 
 ## What I couldn't verify myself
 

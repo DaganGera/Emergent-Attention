@@ -125,7 +125,9 @@ function renderResult(result) {
   setScopeView("signal");
   imgSignal.classList.add("visible");
 
-  decisionDomainTag.textContent = result.domain === "busi" ? "ultrasound" : "photo";
+  const domainLabel = result.domain === "busi" ? "ultrasound" : "photo";
+  const ensembleNote = result.ensemble_size > 1 ? ` · ${result.ensemble_size}-seed ensemble` : "";
+  decisionDomainTag.textContent = domainLabel + ensembleNote;
 
   const top = result.top_predictions;
   const rows = top
