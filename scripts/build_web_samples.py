@@ -22,7 +22,7 @@ from PIL import Image
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _REPO_ROOT)
 
-from src.data.busi import build_busi_datasets, CLASSES as BUSI_CLASSES
+from src.data.busbra import build_busbra_datasets, CLASSES as BUSBRA_CLASSES
 
 OUT_DIR = os.path.join(_REPO_ROOT, "webapp", "backend", "static", "samples")
 RNG = random.Random(42)
@@ -58,21 +58,21 @@ def build_cifar100_samples(n_total: int = 12) -> None:
     print(f"Wrote {len(manifest)} CIFAR-100 samples to {out_dir}")
 
 
-def build_busi_samples(n_per_class: int = 3) -> None:
-    _, val_ds = build_busi_datasets(
+def build_busbra_samples(n_per_class: int = 4) -> None:
+    _, val_ds = build_busbra_datasets(
         train_transform=None, val_transform=None,
-        root=os.path.join(_REPO_ROOT, "data", "busi", "Dataset_BUSI_with_GT"),
+        root=os.path.join(_REPO_ROOT, "data", "busbra", "BUSBRA", "BUSBRA"),
     )
-    by_class: dict[int, list] = {i: [] for i in range(len(BUSI_CLASSES))}
+    by_class: dict[int, list] = {i: [] for i in range(len(BUSBRA_CLASSES))}
     for i in range(len(val_ds)):
         img, label = val_ds[i]
         by_class[label].append(img)
 
-    out_dir = os.path.join(OUT_DIR, "busi")
+    out_dir = os.path.join(OUT_DIR, "busbra")
     os.makedirs(out_dir, exist_ok=True)
 
     manifest = []
-    for cls_idx, cls_name in enumerate(BUSI_CLASSES):
+    for cls_idx, cls_name in enumerate(BUSBRA_CLASSES):
         pool = by_class[cls_idx]
         chosen = RNG.sample(range(len(pool)), min(n_per_class, len(pool)))
         for k, idx in enumerate(chosen):
@@ -82,9 +82,9 @@ def build_busi_samples(n_per_class: int = 3) -> None:
 
     with open(os.path.join(out_dir, "manifest.json"), "w") as f:
         json.dump(manifest, f, indent=2)
-    print(f"Wrote {len(manifest)} BUSI samples to {out_dir}")
+    print(f"Wrote {len(manifest)} BUS-BRA samples to {out_dir}")
 
 
 if __name__ == "__main__":
     build_cifar100_samples()
-    build_busi_samples()
+    build_busbra_samples()

@@ -1,0 +1,14 @@
+dataset: busbra
+data_root: ./data
+busbra_root: data/busbra/BUSBRA/BUSBRA
+batch_size: 64
+num_workers: 0
+pin_memory: true
+
+# 1,875 images, patient-level split (src/data/busbra.py) -> ~1500 train / ~375
+# val. Binary benign/malignant (68/32), less severe than BUSI's 3-way 56/27/17.
+#
+# NOTE: pass model.num_classes=2 on the command line. The model configs
+# default to 100 for CIFAR-100 and nothing infers class count from the dataset.
+train_fraction: 1.0
+subsample_seed: 42

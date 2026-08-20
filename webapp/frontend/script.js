@@ -125,7 +125,7 @@ function renderResult(result) {
   setScopeView("signal");
   imgSignal.classList.add("visible");
 
-  const domainLabel = result.domain === "busi" ? "ultrasound" : "photo";
+  const domainLabel = result.domain === "busbra" ? "ultrasound" : "photo";
   const ensembleNote = result.ensemble_size > 1 ? ` · ${result.ensemble_size}-seed ensemble` : "";
   decisionDomainTag.textContent = domainLabel + ensembleNote;
 
@@ -221,7 +221,7 @@ async function runReasoning(result) {
 
 function onModeChange(mode) {
   state.mode = mode;
-  disclaimer.hidden = mode !== "busi";
+  disclaimer.hidden = mode !== "busbra";
   el("scope-title").textContent = "Input";
   scopeIdle.hidden = false;
   scopeToggle.hidden = true;

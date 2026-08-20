@@ -16,8 +16,8 @@
     <div class="mode-switch" role="radiogroup" aria-label="Classification mode">
       <input type="radio" name="mode" id="mode-cifar" value="cifar100" checked>
       <label for="mode-cifar">General photos</label>
-      <input type="radio" name="mode" id="mode-busi" value="busi">
-      <label for="mode-busi">Ultrasound scans</label>
+      <input type="radio" name="mode" id="mode-busbra" value="busbra">
+      <label for="mode-busbra">Ultrasound scans</label>
     </div>
 
     <div class="status-light"><span class="dot"></span> model loaded, idle</div>
@@ -93,19 +93,19 @@
           <div class="caption">correct on everyday photos across 100 categories — matching a conventional design that needed 4.3× the internal machinery</div>
         </div>
         <div class="spec-card">
-          <div class="value">+9.6<small>pp</small></div>
-          <div class="caption">accuracy advantage over a conventional design specifically on speckle-type noise, the kind real ultrasound produces</div>
+          <div class="value">73.2<small>% vs 49.6%</small></div>
+          <div class="caption">macro-F1 on the same ultrasound task — the conventional design collapses toward over-predicting malignant (30% benign recall); this system doesn't</div>
         </div>
         <div class="spec-card">
-          <div class="value">49.8<small>% vs 36.4%</small></div>
-          <div class="caption">balanced accuracy on real breast-ultrasound scans, this system vs. a conventional comparison, averaged over 3 independent training runs each</div>
+          <div class="value">74.9<small>% vs 59.5%</small></div>
+          <div class="caption">balanced accuracy on real breast-ultrasound scans (BUS-BRA: 1,875 images / 1,064 patients), this system vs. a conventional comparison, on a genuine patient-level held-out split</div>
         </div>
       </div>
     </div>
   </details>
 
   <footer class="credits">
-    EMERGENT-ATTENTION · HYBRID-NCA-VIT · local inference, checkpoints/nca_vit_hybrid/{cifar100,busi}/seed42/best.pt
+    EMERGENT-ATTENTION · HYBRID-NCA-VIT · local inference, cifar100 + busbra seed42 checkpoints
   </footer>
 
 </div>

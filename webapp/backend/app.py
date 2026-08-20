@@ -83,7 +83,7 @@ def script() -> FileResponse:
 
 @app.get("/api/samples/{domain}")
 def get_samples(domain: str) -> list[dict]:
-    if domain not in ("cifar100", "busi"):
+    if domain not in ("cifar100", "busbra"):
         raise HTTPException(404, "unknown domain")
     return samples.list_samples(domain)
 
@@ -94,8 +94,8 @@ async def predict(
     file: UploadFile | None = File(None),
     sample_id: str | None = Form(None),
 ) -> dict:
-    if domain not in ("cifar100", "busi"):
-        raise HTTPException(400, "domain must be 'cifar100' or 'busi'")
+    if domain not in ("cifar100", "busbra"):
+        raise HTTPException(400, "domain must be 'cifar100' or 'busbra'")
 
     if file is not None:
         raw = await file.read()

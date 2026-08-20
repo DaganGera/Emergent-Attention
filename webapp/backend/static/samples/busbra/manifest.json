@@ -1,0 +1,42 @@
+[
+  {
+    "id": "benign_1",
+    "file": "benign_1.png",
+    "true_label": "benign"
+  },
+  {
+    "id": "benign_2",
+    "file": "benign_2.png",
+    "true_label": "benign"
+  },
+  {
+    "id": "benign_3",
+    "file": "benign_3.png",
+    "true_label": "benign"
+  },
+  {
+    "id": "benign_4",
+    "file": "benign_4.png",
+    "true_label": "benign"
+  },
+  {
+    "id": "malignant_1",
+    "file": "malignant_1.png",
+    "true_label": "malignant"
+  },
+  {
+    "id": "malignant_2",
+    "file": "malignant_2.png",
+    "true_label": "malignant"
+  },
+  {
+    "id": "malignant_3",
+    "file": "malignant_3.png",
+    "true_label": "malignant"
+  },
+  {
+    "id": "malignant_4",
+    "file": "malignant_4.png",
+    "true_label": "malignant"
+  }
+]

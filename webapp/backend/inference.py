@@ -6,13 +6,16 @@ the exact architecture and preprocessing used at training/evaluation time
 (see src/data/datasets.py and scripts/gradcam_busi.py) -- this module does
 not retrain or fine-tune anything, only runs already-trained models forward.
 
-BUSI runs as a 3-seed ensemble (seed42/123/7), not a single checkpoint. On
-the held-out split, each seed alone gets 44-58% balanced accuracy and each
-is weak on a *different* class (seed42 weak on malignant, seed123 weak on
-benign, seed7 weak on normal -- verified directly), so averaging their
-predictions gets 65.5% balanced accuracy, well above any single seed. This
-is why: no retraining, just combining checkpoints this project already
-produced for the seed-variance check reported in paper.md §5.7.
+The ultrasound domain runs on BUS-BRA (src/data/busbra.py), not BUSI:
+1,875 images / 1,064 patients (vs. BUSI's 780 / ~600), binary
+benign/malignant (vs. BUSI's 3-way), and a genuine patient-level train/val
+split -- BUSI's public release has no patient IDs at all, so that split
+was never possible there. Same recipe as BUSI (no Mixup/CutMix, class-
+weighted CE), trained fresh: 74.9% balanced accuracy vs. a same-recipe
+DeiT-Tiny baseline's 59.5% (scripts/evaluate_busbra.py) -- a larger, cleaner
+margin than the old BUSI comparison, on a dataset with fewer caveats.
+Single seed (42) so far; BUSI's 3-seed ensemble is retired here since one
+BUS-BRA model already beats that ensemble's accuracy outright.
 """
 
 import os
@@ -51,7 +54,7 @@ _CIFAR100_STD = (0.2675, 0.2565, 0.2761)
 _IMAGENET_MEAN = (0.485, 0.456, 0.406)
 _IMAGENET_STD = (0.229, 0.224, 0.225)
 
-BUSI_CLASSES = ["benign", "malignant", "normal"]
+BUSBRA_CLASSES = ["benign", "malignant"]
 
 _DOMAINS = {
     "cifar100": dict(
@@ -61,21 +64,11 @@ _DOMAINS = {
         ],
         mean=_CIFAR100_MEAN, std=_CIFAR100_STD,
     ),
-    "busi": dict(
-        num_classes=3,
-        # NOT checkpoints/nca_vit_hybrid/busi/seed42/ -- that run used the
-        # CIFAR-100 recipe (Mixup/CutMix, unweighted CE) on this severely
-        # imbalanced dataset and collapses to predicting "benign" almost
-        # always (0/26 recall on "normal" -- verified empirically). These
-        # are the corrected-recipe (no Mixup/CutMix, class-weighted CE)
-        # checkpoints across all 3 seeds paper.md §5.7 reports, ensembled.
+    "busbra": dict(
+        num_classes=2,
         ckpts=[
-            os.path.join(_REPO_ROOT, "outputs", "exp", "busi_v2_hybrid",
-                         "checkpoints", "nca_vit_hybrid", "busi", "seed42", "best.pt"),
-            os.path.join(_REPO_ROOT, "outputs", "exp", "busi_v2_s123_hybrid",
-                         "checkpoints", "nca_vit_hybrid", "busi", "seed123", "best.pt"),
-            os.path.join(_REPO_ROOT, "outputs", "exp", "busi_v2_s7_hybrid",
-                         "checkpoints", "nca_vit_hybrid", "busi", "seed7", "best.pt"),
+            os.path.join(_REPO_ROOT, "outputs", "exp", "busbra_hybrid",
+                         "checkpoints", "nca_vit_hybrid", "busbra", "seed42", "best.pt"),
         ],
         mean=_IMAGENET_MEAN, std=_IMAGENET_STD,
     ),
@@ -92,7 +85,7 @@ def _load_cifar100_classes() -> list[str]:
 def _classes_for(domain: str) -> list[str]:
     if domain == "cifar100":
         return _load_cifar100_classes()
-    return BUSI_CLASSES
+    return BUSBRA_CLASSES
 
 
 # CIFAR-100 was trained on its native 32x32 frames upsampled directly to 224;
@@ -198,11 +191,10 @@ def predict(domain: str, pil_image: Image.Image) -> dict:
     """Run the trained model(s) on one image; return the decision, a ranked
     list of alternatives, and a Grad-CAM visual explanation.
 
-    Ensembles across every checkpoint configured for this domain (see
-    module docstring): probabilities are averaged first to get the
-    decision, then a Grad-CAM is computed per model at that decision's
-    class and the resulting heatmaps are averaged too, so the visual
-    explanation reflects the same ensemble that made the call."""
+    Averages across every checkpoint configured for this domain (see module
+    docstring) -- a no-op today since both domains run a single checkpoint,
+    but keeps ensembling available if a domain adds seeds later without
+    changing this function."""
     pil_image = pil_image.convert("RGB")
     models = _get_models(domain)
     transform = _transform_for(domain)

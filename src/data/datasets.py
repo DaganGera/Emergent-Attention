@@ -11,6 +11,7 @@ import torchvision.transforms as T
 
 from src.data.plantvillage import build_plantvillage_datasets
 from src.data.busi import build_busi_datasets
+from src.data.busbra import build_busbra_datasets
 
 
 _CIFAR100_MEAN = (0.5071, 0.4867, 0.4408)
@@ -62,6 +63,30 @@ def _build_busi_train_transform(img_size: int) -> T.Compose:
 
 
 def _build_busi_val_transform(img_size: int) -> T.Compose:
+    return T.Compose([
+        T.Resize((img_size, img_size), interpolation=T.InterpolationMode.BICUBIC),
+        T.ToTensor(),
+        T.Normalize(_PLANTVILLAGE_MEAN, _PLANTVILLAGE_STD),
+    ])
+
+
+def _build_busbra_train_transform(img_size: int) -> T.Compose:
+    # Same rationale as BUSI (src/data/busi.py): no vertical flip (ultrasound
+    # depth runs top-to-bottom from the transducer, a vertical flip is not a
+    # physically valid image), no RandAugment (its posterise/solarise/equalise
+    # ops distort the speckle statistics under study).
+    return T.Compose([
+        T.RandomResizedCrop(img_size, scale=(0.8, 1.0), ratio=(0.9, 1.1),
+                            interpolation=T.InterpolationMode.BICUBIC),
+        T.RandomHorizontalFlip(),
+        T.ColorJitter(brightness=0.2, contrast=0.2),
+        T.ToTensor(),
+        T.Normalize(_PLANTVILLAGE_MEAN, _PLANTVILLAGE_STD),
+        T.RandomErasing(p=0.25),
+    ])
+
+
+def _build_busbra_val_transform(img_size: int) -> T.Compose:
     return T.Compose([
         T.Resize((img_size, img_size), interpolation=T.InterpolationMode.BICUBIC),
         T.ToTensor(),
@@ -165,10 +190,16 @@ def build_loaders(cfg) -> tuple[DataLoader, DataLoader]:
             val_transform=_build_busi_val_transform(img_size),
             root=data_cfg.get("busi_root", "data/busi/Dataset_BUSI_with_GT"),
         )
+    elif dataset_name == "busbra":
+        train_dataset, val_dataset = build_busbra_datasets(
+            train_transform=_build_busbra_train_transform(img_size),
+            val_transform=_build_busbra_val_transform(img_size),
+            root=data_cfg.get("busbra_root", "data/busbra/BUSBRA/BUSBRA"),
+        )
     else:
         raise ValueError(
             f"Unsupported dataset: {dataset_name}. "
-            f"Supported: 'cifar100', 'plantvillage', 'busi'."
+            f"Supported: 'cifar100', 'plantvillage', 'busi', 'busbra'."
         )
 
     # Data-efficiency sweeps: keep only a stratified slice of the train split.
