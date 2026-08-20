@@ -1,0 +1,62 @@
+[
+  {
+    "id": "streetcar",
+    "file": "streetcar.png",
+    "true_label": "streetcar"
+  },
+  {
+    "id": "butterfly",
+    "file": "butterfly.png",
+    "true_label": "butterfly"
+  },
+  {
+    "id": "bear",
+    "file": "bear.png",
+    "true_label": "bear"
+  },
+  {
+    "id": "wardrobe",
+    "file": "wardrobe.png",
+    "true_label": "wardrobe"
+  },
+  {
+    "id": "girl",
+    "file": "girl.png",
+    "true_label": "girl"
+  },
+  {
+    "id": "elephant",
+    "file": "elephant.png",
+    "true_label": "elephant"
+  },
+  {
+    "id": "cup",
+    "file": "cup.png",
+    "true_label": "cup"
+  },
+  {
+    "id": "castle",
+    "file": "castle.png",
+    "true_label": "castle"
+  },
+  {
+    "id": "bus",
+    "file": "bus.png",
+    "true_label": "bus"
+  },
+  {
+    "id": "telephone",
+    "file": "telephone.png",
+    "true_label": "telephone"
+  },
+  {
+    "id": "rocket",
+    "file": "rocket.png",
+    "true_label": "rocket"
+  },
+  {
+    "id": "boy",
+    "file": "boy.png",
+    "true_label": "boy"
+  }
+]

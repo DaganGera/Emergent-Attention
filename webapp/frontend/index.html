@@ -1,0 +1,113 @@
+<title>Emergent Attention — Diagnostic Console</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/style.css">
+
+<div class="grain" aria-hidden="true"></div>
+
+<div class="shell">
+
+  <header class="console-bar">
+    <div class="wordmark">
+      <span class="diamond">◆</span>
+      <h1>Emergent Attention</h1>
+      <span class="subtitle">live diagnostic console</span>
+    </div>
+
+    <div class="mode-switch" role="radiogroup" aria-label="Classification mode">
+      <input type="radio" name="mode" id="mode-cifar" value="cifar100" checked>
+      <label for="mode-cifar">General photos</label>
+      <input type="radio" name="mode" id="mode-busi" value="busi">
+      <label for="mode-busi">Ultrasound scans</label>
+    </div>
+
+    <div class="status-light"><span class="dot"></span> model loaded, idle</div>
+  </header>
+
+  <section class="intake">
+    <div class="sample-strip" id="sample-strip" aria-label="Sample images"></div>
+    <label class="uploader" id="uploader" for="file-input">
+      <span>⇪</span>
+      <span id="uploader-text">drop / choose an image</span>
+      <input type="file" id="file-input" accept="image/*">
+    </label>
+  </section>
+
+  <main class="console-grid">
+    <div class="panel">
+      <div class="panel-head">
+        <span id="scope-title">Input</span>
+        <span id="scope-status"></span>
+      </div>
+      <div class="scope" id="scope">
+        <img class="scope-image" id="img-signal" alt="">
+        <img class="scope-image" id="img-heatmap" alt="">
+        <div class="scope-idle" id="scope-idle">
+          <div>NO SIGNAL</div>
+          <div>choose a sample above, or drop in your own image<span class="cursor">▮</span></div>
+        </div>
+        <div class="scope-toggle" id="scope-toggle" hidden>
+          <button type="button" data-view="signal" class="active">signal</button>
+          <button type="button" data-view="heatmap">heatmap</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="stack">
+      <div class="panel decision-panel">
+        <div class="panel-head"><span>Decision</span><span id="decision-domain-tag"></span></div>
+        <div class="decision-body" id="decision-body">
+          <div style="color: var(--ink-faint); font-family: var(--font-mono); font-size: 0.82rem;">
+            awaiting a classification…
+          </div>
+        </div>
+      </div>
+
+      <div class="panel reasoning-panel" style="margin-top: 18px;">
+        <div class="panel-head"><span>Reasoning module</span><span>groq/nvidia-hosted LLM</span></div>
+        <div class="reasoning-body placeholder" id="reasoning-body">
+          <span class="prompt-glyph">&gt;</span>waiting for a decision to explain…
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="disclaimer" id="disclaimer" hidden>
+    Demonstration only — this is a research system, not a medical device, and its output must
+    never be used for real diagnosis or treatment decisions.
+  </div>
+
+  <details class="how-it-works">
+    <summary>How this system works</summary>
+    <div class="how-it-works-body">
+      <p>
+        Every image you test takes the same path: it's standardised, then reviewed in two stages —
+        first region-by-region for local consistency, then as a whole for global context — before a
+        decision stage produces the classification above. An explanation module then marks the region
+        of the image that most influenced that decision (the heatmap), and a reasoning module writes
+        the plain-language paragraph above it.
+      </p>
+      <img src="/static/system_workflow.png" alt="System workflow diagram: image acquisition through preprocessing, a two-stage local-then-global processing engine, a decision module, and parallel explanation and reasoning modules that combine into one reviewed output.">
+      <div class="spec-grid">
+        <div class="spec-card">
+          <div class="value">82<small>/100</small></div>
+          <div class="caption">correct on everyday photos across 100 categories — matching a conventional design that needed 4.3× the internal machinery</div>
+        </div>
+        <div class="spec-card">
+          <div class="value">+9.6<small>pp</small></div>
+          <div class="caption">accuracy advantage over a conventional design specifically on speckle-type noise, the kind real ultrasound produces</div>
+        </div>
+        <div class="spec-card">
+          <div class="value">49.8<small>% vs 36.4%</small></div>
+          <div class="caption">balanced accuracy on real breast-ultrasound scans, this system vs. a conventional comparison, averaged over 3 independent training runs each</div>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <footer class="credits">
+    EMERGENT-ATTENTION · HYBRID-NCA-VIT · local inference, checkpoints/nca_vit_hybrid/{cifar100,busi}/seed42/best.pt
+  </footer>
+
+</div>
+
+<script src="/script.js"></script>

@@ -1,0 +1,7 @@
+# Extra dependencies for the demo website, on top of the main requirements.txt
+# (which already provides torch, torchvision, timm, matplotlib, pillow).
+
+fastapi>=0.115.0
+uvicorn>=0.30.0
+python-multipart>=0.0.9
+openai>=1.40.0
